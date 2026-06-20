@@ -87,10 +87,25 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 | `getCategoryMembers(categoryTitle)`            | `Array<{ pageid, ns, title }>`            |
 | `searchCategories(query)`                      | `string[]`                                |
 | `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                    |
+| `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px |
 | `clearCache()`                                 | `void`                                    |
 
-Pass `flags: { category: string[] }` to any page-fetching method to filter results to pages
-belonging to all listed categories.
+Pass `flags` to any page-fetching method to filter or augment results:
+
+| Flag             | Type       | Description                                                                 |
+| ---------------- | ---------- | --------------------------------------------------------------------------- |
+| `category`       | `string[]` | Filter results to pages belonging to all listed categories.                 |
+| `thumbnailSize`  | `number`   | Scale thumbnail URLs to this width (px) when building `WikiPage` results.   |
+
+### `WikiPage` properties
+
+| Property    | Type     | Description                                               |
+| ----------- | -------- | --------------------------------------------------------- |
+| `id`        | `number` | MediaWiki page ID.                                        |
+| `title`     | `string` | Page title.                                               |
+| `thumbnail` | `string` | Thumbnail URL (empty string if the page has no image).    |
+| `categories`| `string[]`| Category titles the page belongs to.                     |
+| `canonicalUrl` | `string` | Canonical URL of the page.                            |
 
 ### `WikiPage` instance methods
 

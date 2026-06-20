@@ -5,8 +5,6 @@ dist/
 .env
 .env.*
 coverage/
-.changeset/*.md
-!.changeset/README.md
 graphify-out/
 CLAUDE.md
 .claude/

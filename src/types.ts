@@ -192,6 +192,7 @@ export interface WikiSearchGeneratorPageItem {
   ns: number;
   title: string;
   index: number;
+  thumbnail?: string;
   categories: { ns: number; title: string }[];
   canonicalUrl: string;
 }
@@ -344,6 +345,7 @@ export interface WikiPage {
   id: number;
   title: string;
   canonicalUrl: string;
+  thumbnail: string;
   categories: string[];
   getStructuredContent: () => Promise<Record<string, string>>;
   getPageContent: () => Promise<string | undefined>;
@@ -423,6 +425,7 @@ export interface ComicExtras {
 
 export interface WikiPageFlags {
   category?: string[];
+  thumbnailSize?: number;
 }
 
 export interface WikiContentOptions {
@@ -434,6 +437,7 @@ export interface Wiki {
   getPageById: (pageId: number, flags?: WikiPageFlags) => Promise<WikiPage | null>;
   getPageByTitle: (title: string, flags?: WikiPageFlags) => Promise<WikiPage | null>;
   getPagesByCategory: (category: string) => Promise<WikiPage[]>;
+  getThumbnailById: (pageId: number, width?: number) => Promise<string>;
   getPageContent: {
     (
       pageId: number,

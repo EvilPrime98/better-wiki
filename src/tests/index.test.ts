@@ -362,6 +362,7 @@ describe('getPageById', () => {
     const page = await wiki('https://dc.fandom.com').getPageById(42);
     expect(page!.id).toBe(42);
     expect(page!.title).toBe('Batman');
+    expect(page!.thumbnail).toBe('');
   });
 
   it('returns null when required category is absent', async () => {
@@ -445,5 +446,57 @@ describe('getPage', () => {
     });
     expect(pages).toHaveLength(1);
     expect(pages[0]!.title).toBe('Batman');
+  });
+});
+
+const thumbnailApiResponse = (pageid: number, thumbnailSource?: string) =>
+  jsonResponse({
+    batchcomplete: '',
+    query: {
+      pages: {
+        [String(pageid)]: {
+          pageid,
+          ns: 0,
+          title: 'Batman',
+          ...(thumbnailSource
+            ? { thumbnail: { source: thumbnailSource, width: 400, height: 600 } }
+            : {}),
+        },
+      },
+    },
+  });
+
+const BASE_THUMBNAIL =
+  'https://static.wikia.nocookie.net/dc/images/batman.jpg/revision/latest/scale-to-width-down/400/batman.jpg';
+
+describe('getThumbnailById', () => {
+  it('returns the URL scaled to the requested width', async () => {
+    fetchMock.mockResolvedValue(thumbnailApiResponse(42, BASE_THUMBNAIL));
+    const url = await wiki('https://dc.fandom.com').getThumbnailById(42, 200);
+    expect(url).toBe(
+      BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'),
+    );
+  });
+
+  it('strips the existing scale when no width is provided', async () => {
+    fetchMock.mockResolvedValue(thumbnailApiResponse(42, BASE_THUMBNAIL));
+    const url = await wiki('https://dc.fandom.com').getThumbnailById(42);
+    expect(url).not.toContain('scale-to-width-down');
+  });
+
+  it('returns empty string when the page has no thumbnail', async () => {
+    fetchMock.mockResolvedValue(thumbnailApiResponse(42));
+    const url = await wiki('https://dc.fandom.com').getThumbnailById(42);
+    expect(url).toBe('');
+  });
+
+  it('requests pageimages prop with pithumbsize 400 for the given pageId', async () => {
+    fetchMock.mockResolvedValue(thumbnailApiResponse(42, BASE_THUMBNAIL));
+    await wiki('https://dc.fandom.com').getThumbnailById(42, 100);
+    const url = new URL(lastUrl());
+    expect(url.searchParams.get('prop')).toBe('pageimages');
+    expect(url.searchParams.get('pithumbsize')).toBe('400');
+    expect(url.searchParams.get('pageids')).toBe('42');
+    expect(url.searchParams.get('piprop')).toBe('thumbnail');
   });
 });

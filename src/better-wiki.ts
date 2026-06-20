@@ -161,8 +161,18 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
   };
 
   const scaleUrl = (url: string, width?: number): string => {
-    if (!width) return url;
+    if (!url) return url;
+    if (width == null) {
+      return url.replace(/\/scale-to-width-down\/\d+/, '');
+    }
+    if (/\/scale-to-width-down\/\d+/.test(url)) {
+      return url.replace(
+        /\/scale-to-width-down\/\d+/,
+        `/scale-to-width-down/${width}`
+      );
+    }
     const [f1, f2] = url.split('/revision/latest');
+    if (!f2) return url;
     return `${f1}/revision/latest/scale-to-width-down/${width}${f2}`;
   };
 
@@ -303,6 +313,44 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
       );
     };
   };
+
+  const getThumbnail = async (
+    pageId: number,
+    width?: number
+  ): Promise<string> => {
+
+    const url = buildApiUrl({
+      action: 'query',
+      pageids: String(pageId),
+      prop: 'pageimages',
+      piprop: 'thumbnail',
+      pithumbsize: '400'
+    });
+
+    const data = await getCachedOrFetch<{
+      batchcomplete: string;
+      query: {
+        pages: Record<string, {
+          pageid: number;
+          ns: number;
+          title: string;
+          thumbnail: {
+            source: string;
+            width: number;
+            height: number;
+          }
+        }>
+      }
+    }>(url);
+
+    const pages = data.query.pages;
+
+    return scaleUrl(
+      Object.values(pages)[0]?.thumbnail?.source || '',
+      width
+    )
+
+  }
 
   //IMPLEMENTATIONS - TODO DELETE
 
@@ -790,6 +838,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     return {
       id: page.pageid,
       title: page.title,
+      thumbnail: page.thumbnail || '',
       categories: page.categories.map((c) => c.title),
       canonicalUrl: page.canonicalUrl,
       getStructuredContent: async () => {
@@ -812,8 +861,10 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
       gsrsearch: query,
       gsrnamespace: '0',
       gsrlimit: '50',
-      prop: 'info',
+      prop: 'info|pageimages',
       inprop: 'url',
+      piprop: 'thumbnail',
+      pithumbsize: '200'
     });
 
     const data = await getCachedOrFetch<{
@@ -838,6 +889,11 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
             fullurl: string;
             editurl: string;
             canonicalurl: string;
+            thumbnail: {
+              source: string;
+              width: number;
+              height: number;
+            }
           }
         >;
       };
@@ -852,6 +908,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
           categories: await getCategoriesFromPage(page.pageid),
         };
         const builtPage = buildPage({
+          thumbnail: scaleUrl(pageWithCateg.thumbnail?.source, flags.thumbnailSize),
           canonicalUrl: pageWithCateg.canonicalurl,
           pageid: pageWithCateg.pageid,
           ns: pageWithCateg.ns,
@@ -1103,6 +1160,8 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     getCategoryMembers,
     searchCategories,
     getCategoriesFromPage,
+    getThumbnailById: getThumbnail,
     clearCache: () => apiCache.clear(),
   };
+  
 }
