@@ -473,9 +473,7 @@ describe('getThumbnailById', () => {
   it('returns the URL scaled to the requested width', async () => {
     fetchMock.mockResolvedValue(thumbnailApiResponse(42, BASE_THUMBNAIL));
     const url = await wiki('https://dc.fandom.com').getThumbnailById(42, 200);
-    expect(url).toBe(
-      BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'),
-    );
+    expect(url).toBe(BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'));
   });
 
   it('strips the existing scale when no width is provided', async () => {

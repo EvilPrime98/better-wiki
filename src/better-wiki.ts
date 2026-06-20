@@ -166,10 +166,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
       return url.replace(/\/scale-to-width-down\/\d+/, '');
     }
     if (/\/scale-to-width-down\/\d+/.test(url)) {
-      return url.replace(
-        /\/scale-to-width-down\/\d+/,
-        `/scale-to-width-down/${width}`
-      );
+      return url.replace(/\/scale-to-width-down\/\d+/, `/scale-to-width-down/${width}`);
     }
     const [f1, f2] = url.split('/revision/latest');
     if (!f2) return url;
@@ -314,43 +311,38 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     };
   };
 
-  const getThumbnail = async (
-    pageId: number,
-    width?: number
-  ): Promise<string> => {
-
+  const getThumbnail = async (pageId: number, width?: number): Promise<string> => {
     const url = buildApiUrl({
       action: 'query',
       pageids: String(pageId),
       prop: 'pageimages',
       piprop: 'thumbnail',
-      pithumbsize: '400'
+      pithumbsize: '400',
     });
 
     const data = await getCachedOrFetch<{
       batchcomplete: string;
       query: {
-        pages: Record<string, {
-          pageid: number;
-          ns: number;
-          title: string;
-          thumbnail: {
-            source: string;
-            width: number;
-            height: number;
+        pages: Record<
+          string,
+          {
+            pageid: number;
+            ns: number;
+            title: string;
+            thumbnail: {
+              source: string;
+              width: number;
+              height: number;
+            };
           }
-        }>
-      }
+        >;
+      };
     }>(url);
 
     const pages = data.query.pages;
 
-    return scaleUrl(
-      Object.values(pages)[0]?.thumbnail?.source || '',
-      width
-    )
-
-  }
+    return scaleUrl(Object.values(pages)[0]?.thumbnail?.source || '', width);
+  };
 
   //IMPLEMENTATIONS - TODO DELETE
 
@@ -864,7 +856,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
       prop: 'info|pageimages',
       inprop: 'url',
       piprop: 'thumbnail',
-      pithumbsize: '200'
+      pithumbsize: '200',
     });
 
     const data = await getCachedOrFetch<{
@@ -893,7 +885,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
               source: string;
               width: number;
               height: number;
-            }
+            };
           }
         >;
       };
@@ -1163,5 +1155,4 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     getThumbnailById: getThumbnail,
     clearCache: () => apiCache.clear(),
   };
-  
 }

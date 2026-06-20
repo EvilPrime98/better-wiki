@@ -76,36 +76,50 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 
 ### Client methods
 
-| Method                                         | Returns                                   |
-| ---------------------------------------------- | ----------------------------------------- |
-| `getPage(query, flags?)`                       | `WikiPage[]` — full-text search results   |
-| `getPageById(pageId, flags?)`                  | `WikiPage \| null`                        |
-| `getPageByTitle(title, flags?)`                | `WikiPage \| null`                        |
-| `getPagesByCategory(category)`                 | `WikiPage[]`                              |
-| `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext      |
-| `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox |
-| `getCategoryMembers(categoryTitle)`            | `Array<{ pageid, ns, title }>`            |
-| `searchCategories(query)`                      | `string[]`                                |
-| `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                    |
+| Method                                         | Returns                                                   |
+| ---------------------------------------------- | --------------------------------------------------------- |
+| `getPage(query, flags?)`                       | `WikiPage[]` — full-text search results                   |
+| `getPageById(pageId, flags?)`                  | `WikiPage \| null`                                        |
+| `getPageByTitle(title, flags?)`                | `WikiPage \| null`                                        |
+| `getPagesByCategory(category)`                 | `WikiPage[]`                                              |
+| `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext                      |
+| `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox                 |
+| `getCategoryMembers(categoryTitle)`            | `Array<{ pageid, ns, title }>`                            |
+| `searchCategories(query)`                      | `string[]`                                                |
+| `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                                    |
 | `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px |
-| `clearCache()`                                 | `void`                                    |
+| `clearCache()`                                 | `void`                                                    |
 
 Pass `flags` to any page-fetching method to filter or augment results:
 
-| Flag             | Type       | Description                                                                 |
-| ---------------- | ---------- | --------------------------------------------------------------------------- |
-| `category`       | `string[]` | Filter results to pages belonging to all listed categories.                 |
-| `thumbnailSize`  | `number`   | Scale thumbnail URLs to this width (px) when building `WikiPage` results.   |
+| Flag            | Type       | Description                                                               |
+| --------------- | ---------- | ------------------------------------------------------------------------- |
+| `category`      | `string[]` | Filter results to pages belonging to all listed categories.               |
+| `thumbnailSize` | `number`   | Scale thumbnail URLs to this width (px) when building `WikiPage` results. |
 
 ### `WikiPage` properties
 
-| Property    | Type     | Description                                               |
-| ----------- | -------- | --------------------------------------------------------- |
-| `id`        | `number` | MediaWiki page ID.                                        |
-| `title`     | `string` | Page title.                                               |
-| `thumbnail` | `string` | Thumbnail URL (empty string if the page has no image).    |
-| `categories`| `string[]`| Category titles the page belongs to.                     |
-| `canonicalUrl` | `string` | Canonical URL of the page.                            |
+| Property       | Type       | Description                                            |
+| -------------- | ---------- | ------------------------------------------------------ |
+| `id`           | `number`   | MediaWiki page ID.                                     |
+| `title`        | `string`   | Page title.                                            |
+| `thumbnail`    | `string`   | Thumbnail URL (empty string if the page has no image). |
+| `categories`   | `string[]` | Category titles the page belongs to.                   |
+| `canonicalUrl` | `string`   | Canonical URL of the page.                             |
+
+### `WikiSearchGeneratorPageItem` properties
+
+Raw page shape returned by the search generator (before `WikiPage` is constructed).
+
+| Property       | Type                                   | Description                                                 |
+| -------------- | -------------------------------------- | ----------------------------------------------------------- |
+| `pageid`       | `number`                               | MediaWiki page ID.                                          |
+| `ns`           | `number`                               | MediaWiki namespace ID.                                     |
+| `title`        | `string`                               | Page title.                                                 |
+| `index`        | `number`                               | Position in the search result set.                          |
+| `thumbnail`    | `string`                               | Thumbnail URL (optional — absent if the page has no image). |
+| `categories`   | `Array<{ ns: number; title: string }>` | Categories the page belongs to.                             |
+| `canonicalUrl` | `string`                               | Canonical URL of the page.                                  |
 
 ### `WikiPage` instance methods
 
