@@ -1,0 +1,68 @@
+{
+  "name": "better-wiki",
+  "version": "0.0.0",
+  "description": "A typed, cache-aware client for MediaWiki/Fandom wikis, with helpers for comics, series and characters.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mediawiki",
+    "fandom",
+    "wiki",
+    "wikia",
+    "api",
+    "comics",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build && pnpm run typecheck",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm run build && changeset publish"
+  },
+  "license": "MIT",
+  "author": "amindev98 <crashboom51@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EvilPrime98/better-wiki.git"
+  },
+  "homepage": "https://github.com/EvilPrime98/better-wiki#readme",
+  "bugs": {
+    "url": "https://github.com/EvilPrime98/better-wiki/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
+    "fallow": "^2.100.0",
+    "prettier": "^3.8.4",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.0",
+    "vitest": "^4.1.8"
+  }
+}

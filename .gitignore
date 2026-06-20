@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.*
+coverage/
+.changeset/*.md
+!.changeset/README.md
+graphify-out/
+CLAUDE.md
+.claude/
+project/
+proof.ts
