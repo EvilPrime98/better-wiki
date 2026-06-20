@@ -118,14 +118,16 @@ describe('searchCategories', () => {
   });
 
   it('returns category titles', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({
-      query: {
-        search: [
-          { title: 'Category:Characters', pageid: 1 },
-          { title: 'Category:Villains', pageid: 2 },
-        ],
-      },
-    }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        query: {
+          search: [
+            { title: 'Category:Characters', pageid: 1 },
+            { title: 'Category:Villains', pageid: 2 },
+          ],
+        },
+      }),
+    );
     const result = await wiki('https://dc.fandom.com').searchCategories('characters');
     expect(result).toEqual(['Category:Characters', 'Category:Villains']);
   });
@@ -139,45 +141,44 @@ describe('getCategoryMembers', () => {
   });
 
   it('returns pageid, ns, title for each member', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({
-      query: {
-        categorymembers: [
-          { pageid: 42, ns: 0, title: 'Batman' },
-        ],
-      },
-    }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        query: {
+          categorymembers: [{ pageid: 42, ns: 0, title: 'Batman' }],
+        },
+      }),
+    );
     const result = await wiki('https://dc.fandom.com').getCategoryMembers('Category:Characters');
     expect(result).toEqual([{ pageid: 42, ns: 0, title: 'Batman' }]);
   });
 });
 
-const membersResponse = (
-  members: { pageid: number; ns: number; title: string }[]
-) => jsonResponse({ query: { categorymembers: members } });
+const membersResponse = (members: { pageid: number; ns: number; title: string }[]) =>
+  jsonResponse({ query: { categorymembers: members } });
 
 const categoriesResponse = (
-  pages: Record<string, { pageid: number; ns: number; title: string; categories: { ns: number; title: string }[] }>
+  pages: Record<
+    string,
+    { pageid: number; ns: number; title: string; categories: { ns: number; title: string }[] }
+  >,
 ) => jsonResponse({ query: { pages } });
 
-const parseResponse = (
-) => jsonResponse({ parse: { title: '', pageId: 0, properties: [] } });
+const parseResponse = () => jsonResponse({ parse: { title: '', pageId: 0, properties: [] } });
 
-const revisionsResponse = (
-  pageid: number, title: string, content = ''
-) => jsonResponse({
-  query: {
-    pages: {
-      [String(pageid)]: {
-        pageid,
-        title,
-        revisions: [{ slots: { main: { '*': content } } }],
+const revisionsResponse = (pageid: number, title: string, content = '') =>
+  jsonResponse({
+    query: {
+      pages: {
+        [String(pageid)]: {
+          pageid,
+          title,
+          revisions: [{ slots: { main: { '*': content } } }],
+        },
       },
     },
-  },
-});
+  });
 
 describe('getPagesByCategory', () => {
-
   it('returns empty array when category has no members', async () => {
     fetchMock.mockResolvedValueOnce(membersResponse([]));
     const result = await wiki('https://dc.fandom.com').getPagesByCategory('Category:Empty');
@@ -194,12 +195,18 @@ describe('getPagesByCategory', () => {
   });
 
   it('returns a WikiPage with correct id, title, categories, and pageContent', async () => {
-
     fetchMock
       .mockResolvedValueOnce(membersResponse([{ pageid: 1, ns: 0, title: 'Batman' }]))
-      .mockResolvedValueOnce(categoriesResponse({
-        '1': { pageid: 1, ns: 0, title: 'Batman', categories: [{ ns: 14, title: 'Category:Characters' }] },
-      }))
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': {
+            pageid: 1,
+            ns: 0,
+            title: 'Batman',
+            categories: [{ ns: 14, title: 'Category:Characters' }],
+          },
+        }),
+      )
       .mockResolvedValueOnce(parseResponse())
       .mockResolvedValueOnce(revisionsResponse(1, 'Batman', '| Real Name = Bruce Wayne'));
 
@@ -208,34 +215,36 @@ describe('getPagesByCategory', () => {
     expect(page!.title).toBe('Batman');
     expect(page!.categories).toEqual(['Category:Characters']);
     expect(typeof page!.getPageContent).toBe('function');
-
   });
 
   it('exposes getImages and getGallery as functions', async () => {
-
     fetchMock
       .mockResolvedValueOnce(membersResponse([{ pageid: 1, ns: 0, title: 'Batman' }]))
-      .mockResolvedValueOnce(categoriesResponse({ '1': { pageid: 1, ns: 0, title: 'Batman', categories: [] } }))
+      .mockResolvedValueOnce(
+        categoriesResponse({ '1': { pageid: 1, ns: 0, title: 'Batman', categories: [] } }),
+      )
       .mockResolvedValueOnce(parseResponse())
       .mockResolvedValueOnce(revisionsResponse(1, 'Batman'));
 
     const [page] = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X');
     expect(typeof page!.getImages).toBe('function');
     expect(typeof page!.getGallery).toBe('function');
-
   });
 
   it('sends one batch categories request with all pageids when members fit in one chunk', async () => {
-
     fetchMock
-      .mockResolvedValueOnce(membersResponse([
-        { pageid: 1, ns: 0, title: 'Batman' },
-        { pageid: 2, ns: 0, title: 'Superman' },
-      ]))
-      .mockResolvedValueOnce(categoriesResponse({
-        '1': { pageid: 1, ns: 0, title: 'Batman', categories: [] },
-        '2': { pageid: 2, ns: 0, title: 'Superman', categories: [] },
-      }))
+      .mockResolvedValueOnce(
+        membersResponse([
+          { pageid: 1, ns: 0, title: 'Batman' },
+          { pageid: 2, ns: 0, title: 'Superman' },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': { pageid: 1, ns: 0, title: 'Batman', categories: [] },
+          '2': { pageid: 2, ns: 0, title: 'Superman', categories: [] },
+        }),
+      )
       .mockResolvedValueOnce(parseResponse())
       .mockResolvedValueOnce(revisionsResponse(1, 'Batman'))
       .mockResolvedValueOnce(parseResponse())
@@ -248,20 +257,22 @@ describe('getPagesByCategory', () => {
     const batchCalls = urls.filter((u) => u.searchParams.get('prop') === 'info|categories');
     expect(batchCalls).toHaveLength(1);
     expect(batchCalls[0]!.searchParams.get('pageids')).toBe('1|2');
-
   });
 
   it('returns pages in member order', async () => {
-
     fetchMock
-      .mockResolvedValueOnce(membersResponse([
-        { pageid: 10, ns: 0, title: 'Alpha' },
-        { pageid: 20, ns: 0, title: 'Beta' },
-      ]))
-      .mockResolvedValueOnce(categoriesResponse({
-        '10': { pageid: 10, ns: 0, title: 'Alpha', categories: [] },
-        '20': { pageid: 20, ns: 0, title: 'Beta', categories: [] },
-      }))
+      .mockResolvedValueOnce(
+        membersResponse([
+          { pageid: 10, ns: 0, title: 'Alpha' },
+          { pageid: 20, ns: 0, title: 'Beta' },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '10': { pageid: 10, ns: 0, title: 'Alpha', categories: [] },
+          '20': { pageid: 20, ns: 0, title: 'Beta', categories: [] },
+        }),
+      )
       .mockResolvedValueOnce(parseResponse())
       .mockResolvedValueOnce(revisionsResponse(10, 'Alpha'))
       .mockResolvedValueOnce(parseResponse())
@@ -269,13 +280,10 @@ describe('getPagesByCategory', () => {
 
     const result = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X');
     expect(result.map((p) => p.id)).toEqual([10, 20]);
-
   });
-
 });
 
 describe('getPageContent', () => {
-
   it('returns the raw wikitext string', async () => {
     fetchMock.mockResolvedValue(revisionsResponse(42, 'Batman', '| Vol = 1\n| Issue = 7'));
     const content = await wiki('https://dc.fandom.com').getPageContent(42);
@@ -290,36 +298,60 @@ describe('getPageContent', () => {
   });
 
   it('throws when the page does not exist', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({
-      query: { pages: { '-1': { pageid: -1, title: 'Nonexistent', revisions: [{ slots: { main: { '*': '' } } }] } } },
-    }));
-    await expect(wiki('https://dc.fandom.com').getPageContent(999)).rejects.toThrow(/does not exist/);
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        query: {
+          pages: {
+            '-1': {
+              pageid: -1,
+              title: 'Nonexistent',
+              revisions: [{ slots: { main: { '*': '' } } }],
+            },
+          },
+        },
+      }),
+    );
+    await expect(wiki('https://dc.fandom.com').getPageContent(999)).rejects.toThrow(
+      /does not exist/,
+    );
   });
-
 });
 
 describe('getCategoriesFromPage', () => {
-
   it('returns an array of category title strings', async () => {
-    fetchMock.mockResolvedValue(categoriesResponse({
-      '1': { pageid: 1, ns: 0, title: 'Batman', categories: [{ ns: 14, title: 'Category:Heroes' }, { ns: 14, title: 'Category:DC' }] },
-    }));
+    fetchMock.mockResolvedValue(
+      categoriesResponse({
+        '1': {
+          pageid: 1,
+          ns: 0,
+          title: 'Batman',
+          categories: [
+            { ns: 14, title: 'Category:Heroes' },
+            { ns: 14, title: 'Category:DC' },
+          ],
+        },
+      }),
+    );
     const result = await wiki('https://dc.fandom.com').getCategoriesFromPage(1);
-    expect(result).toEqual([{ ns: 14, title: 'Category:Heroes' }, { ns: 14, title: 'Category:DC' }]);
+    expect(result).toEqual([
+      { ns: 14, title: 'Category:Heroes' },
+      { ns: 14, title: 'Category:DC' },
+    ]);
   });
-
 });
 
 const pageByIdResponse = (
-  pageid: number, title: string, categories: { ns: number; title: string }[] = []
-) => jsonResponse({
-  continue: { clcontinue: '', continue: '' },
-  query: { pages: { [String(pageid)]: { pageid, ns: 0, title, index: 0, categories } } },
-  limit: {}
-});
+  pageid: number,
+  title: string,
+  categories: { ns: number; title: string }[] = [],
+) =>
+  jsonResponse({
+    continue: { clcontinue: '', continue: '' },
+    query: { pages: { [String(pageid)]: { pageid, ns: 0, title, index: 0, categories } } },
+    limit: {},
+  });
 
 describe('getPageById', () => {
-
   it('returns null when page is absent from response', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ continue: {}, query: { pages: {} }, limit: {} }));
     expect(await wiki('https://dc.fandom.com').getPageById(999)).toBeNull();
@@ -333,28 +365,39 @@ describe('getPageById', () => {
   });
 
   it('returns null when required category is absent', async () => {
-    fetchMock.mockResolvedValue(pageByIdResponse(42, 'Batman', [{ ns: 14, title: 'Category:Heroes' }]));
-    expect(await wiki('https://dc.fandom.com').getPageById(42, { category: ['Category:Villains'] })).toBeNull();
+    fetchMock.mockResolvedValue(
+      pageByIdResponse(42, 'Batman', [{ ns: 14, title: 'Category:Heroes' }]),
+    );
+    expect(
+      await wiki('https://dc.fandom.com').getPageById(42, { category: ['Category:Villains'] }),
+    ).toBeNull();
   });
 
   it('returns the page when required category matches', async () => {
-    fetchMock.mockResolvedValue(pageByIdResponse(42, 'Batman', [{ ns: 14, title: 'Category:Heroes' }]));
-    const page = await wiki('https://dc.fandom.com').getPageById(42, { category: ['Category:Heroes'] });
+    fetchMock.mockResolvedValue(
+      pageByIdResponse(42, 'Batman', [{ ns: 14, title: 'Category:Heroes' }]),
+    );
+    const page = await wiki('https://dc.fandom.com').getPageById(42, {
+      category: ['Category:Heroes'],
+    });
     expect(page!.id).toBe(42);
   });
-
 });
 
 const searchPageResponse = (
-  pages: Record<string, { pageid: number; ns: number; title: string; index: number }>
-) => jsonResponse({ batchcomplete: '', continue: { gsroffset: 0, continue: '' }, query: { pages } });
+  pages: Record<string, { pageid: number; ns: number; title: string; index: number }>,
+) =>
+  jsonResponse({ batchcomplete: '', continue: { gsroffset: 0, continue: '' }, query: { pages } });
 
 describe('getPage', () => {
-
   it('returns WikiPages with correct ids and titles', async () => {
     fetchMock
-      .mockResolvedValueOnce(searchPageResponse({ '42': { pageid: 42, ns: 0, title: 'Batman', index: 0 } }))
-      .mockResolvedValueOnce(categoriesResponse({ '42': { pageid: 42, ns: 0, title: 'Batman', categories: [] } }));
+      .mockResolvedValueOnce(
+        searchPageResponse({ '42': { pageid: 42, ns: 0, title: 'Batman', index: 0 } }),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({ '42': { pageid: 42, ns: 0, title: 'Batman', categories: [] } }),
+      );
     const pages = await wiki('https://dc.fandom.com').getPage('batman');
     expect(pages).toHaveLength(1);
     expect(pages[0]!.id).toBe(42);
@@ -371,19 +414,36 @@ describe('getPage', () => {
 
   it('filters results by category when flags.category is provided', async () => {
     fetchMock
-      .mockResolvedValueOnce(searchPageResponse({
-        '1': { pageid: 1, ns: 0, title: 'Batman', index: 0 },
-        '2': { pageid: 2, ns: 0, title: 'Joker', index: 1 },
-      }))
-      .mockResolvedValueOnce(categoriesResponse({
-        '1': { pageid: 1, ns: 0, title: 'Batman', categories: [{ ns: 14, title: 'Category:Heroes' }] }
-      }))
-      .mockResolvedValueOnce(categoriesResponse({
-        '2': { pageid: 2, ns: 0, title: 'Joker', categories: [{ ns: 14, title: 'Category:Villains' }] }
-      }));
-    const pages = await wiki('https://dc.fandom.com').getPage('dc', { category: ['Category:Heroes'] });
+      .mockResolvedValueOnce(
+        searchPageResponse({
+          '1': { pageid: 1, ns: 0, title: 'Batman', index: 0 },
+          '2': { pageid: 2, ns: 0, title: 'Joker', index: 1 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': {
+            pageid: 1,
+            ns: 0,
+            title: 'Batman',
+            categories: [{ ns: 14, title: 'Category:Heroes' }],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '2': {
+            pageid: 2,
+            ns: 0,
+            title: 'Joker',
+            categories: [{ ns: 14, title: 'Category:Villains' }],
+          },
+        }),
+      );
+    const pages = await wiki('https://dc.fandom.com').getPage('dc', {
+      category: ['Category:Heroes'],
+    });
     expect(pages).toHaveLength(1);
     expect(pages[0]!.title).toBe('Batman');
   });
-
 });

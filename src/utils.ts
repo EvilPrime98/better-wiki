@@ -10,11 +10,7 @@ import type {
 
 const CONNECTORS = ['of', 'the', 'from', 'to'];
 
-export const normalizeTitle = (
-  title: string,
-  addUnderscore = true
-): string => {
-
+export const normalizeTitle = (title: string, addUnderscore = true): string => {
   const normalized = title
     .trim()
     .toLowerCase()
@@ -32,44 +28,30 @@ export const normalizeTitle = (
   }
 
   return addUnderscore ? `${normalized}_` : normalized;
-
 };
 
-export const capitalize = (
-  str: string
-): string => {
-
+export const capitalize = (str: string): string => {
   return str
     .trim()
     .split(' ')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
-
 };
 
-export const chunkArray = <T>(
-  arr: T[],
-  chunkSize = 50
-): T[][] => {
-
+export const chunkArray = <T>(arr: T[], chunkSize = 50): T[][] => {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += chunkSize) {
     chunks.push(arr.slice(i, i + chunkSize));
   }
 
   return chunks;
-
 };
 
-export const removeCoverRevision = (
-  url: string | null
-): string | undefined => {
+export const removeCoverRevision = (url: string | null): string | undefined => {
   return url?.split('/revision')[0];
 };
 
-export const extractYear = (
-  candidate: string
-): string | undefined => {
+export const extractYear = (candidate: string): string | undefined => {
   return candidate.match(/\(([0-9]{4})\)/)?.[1];
 };
 
@@ -94,11 +76,7 @@ export const getInnerText = (html: string): string => {
   return html.replace(/<[^>]+>/g, '').trim();
 };
 
-export const buildComicPageTitle = (
-  title: string,
-  volume: string,
-  issue: string
-): string => {
+export const buildComicPageTitle = (title: string, volume: string, issue: string): string => {
   const normalizedTitle = capitalize(title.trim().replace(/\s+/g, ' ')).replaceAll(' ', '_');
   const normalizedVolume = volume.trim().replace(/\s+/g, ' ');
   const normalizedIssue = issue.trim().replace(/\s+/g, ' ');
@@ -120,17 +98,14 @@ const MONTH_MAP = new Map([
   ['december', '12'],
 ]);
 
-export const normalizeDates = (
-  appearances: CharacterAppearance[]
-): CharacterAppearance[] => {
-
+export const normalizeDates = (appearances: CharacterAppearance[]): CharacterAppearance[] => {
   return appearances.map((element) => {
-
     const releaseMonth = element.releaseDate?.releaseMonth?.toLowerCase();
 
-    const month = releaseMonth && MONTH_MAP.has(releaseMonth)
-      ? MONTH_MAP.get(releaseMonth)
-      : element.releaseDate?.releaseMonth?.padStart(2, '0');
+    const month =
+      releaseMonth && MONTH_MAP.has(releaseMonth)
+        ? MONTH_MAP.get(releaseMonth)
+        : element.releaseDate?.releaseMonth?.padStart(2, '0');
 
     return {
       ...element,
@@ -139,36 +114,28 @@ export const normalizeDates = (
         releaseMonth: month,
       },
     } as CharacterAppearance;
-
   });
-
 };
 
-export const sortAppearances = (
-  appearances: CharacterAppearance[]
-): CharacterAppearance[] => {
-
+export const sortAppearances = (appearances: CharacterAppearance[]): CharacterAppearance[] => {
   return appearances.sort((a, b) => {
-
-    const r1 = parseInt(a.releaseDate?.releaseYear || '0') - parseInt(b.releaseDate?.releaseYear || '0');
+    const r1 =
+      parseInt(a.releaseDate?.releaseYear || '0') - parseInt(b.releaseDate?.releaseYear || '0');
     if (r1 !== 0) return r1;
 
-    const r2 = parseInt(a.releaseDate?.releaseMonth || '0') - parseInt(b.releaseDate?.releaseMonth || '0');
+    const r2 =
+      parseInt(a.releaseDate?.releaseMonth || '0') - parseInt(b.releaseDate?.releaseMonth || '0');
     if (r2 !== 0) return r2;
 
-    const r3 = parseInt(a.releaseDate?.releaseDay || '0') - parseInt(b.releaseDate?.releaseDay || '0');
+    const r3 =
+      parseInt(a.releaseDate?.releaseDay || '0') - parseInt(b.releaseDate?.releaseDay || '0');
     if (r3 !== 0) return r3;
 
     return a.title.localeCompare(b.title);
-
   });
-
 };
 
-export const parseReleaseDate = (
-  pageContent: string | undefined
-): ReleaseDate => {
-  
+export const parseReleaseDate = (pageContent: string | undefined): ReleaseDate => {
   const lines = pageContent?.split('\n') ?? [];
   let releaseDay = '';
   let releaseMonth = '';
@@ -181,13 +148,9 @@ export const parseReleaseDate = (
   }
 
   return { releaseDay, releaseMonth, releaseYear };
-
 };
 
-export const parseCredits = (
-  pageContent: string | undefined
-): ComicCredits => {
-
+export const parseCredits = (pageContent: string | undefined): ComicCredits => {
   const lines = pageContent?.split('\n') ?? [];
 
   const credits: ComicCredits = {
@@ -201,64 +164,59 @@ export const parseCredits = (
   };
 
   lines.forEach((line) => {
-    
     const val = () => line.split('=')[1]?.trim() ?? '';
-    
+
     if (line.startsWith('| Writer')) {
       const v = val();
       if (v) credits.writers.push(v);
     }
-    
+
     if (line.startsWith('| Penciler')) {
       const v = val();
       if (v) credits.artists.push(v);
     }
-    
+
     if (line.startsWith('| Inker')) {
       const v = val();
       if (v) credits.inkers.push(v);
     }
-    
+
     if (line.startsWith('| Colorist')) {
       const v = val();
       if (v) credits.colorists.push(v);
     }
-    
+
     if (line.startsWith('| Letterer')) {
       const v = val();
       if (v) credits.letterers.push(v);
     }
-    
+
     if (line.startsWith('| Editor')) {
       const v = val();
       if (v) credits.editors.push(v);
     }
-    
+
     if (line.startsWith('| Executive Editor')) {
       const v = val();
       if (v) credits.executiveEditors.push(v);
     }
-
   });
 
   return credits;
-
 };
 
 export const parseComicMetadata = (
   pageContent: string | undefined,
-): { 
-  volume: string; 
-  issue: string 
+): {
+  volume: string;
+  issue: string;
 } => {
-
   const lines = pageContent?.split('\n') ?? [];
   const info = { volume: '', issue: '' };
   let volFound = false;
   let issueFound = false;
 
   for (const line of lines) {
-
     if (line.startsWith('| Vol')) {
       info.volume = line.split('=')[1]?.trim() ?? '';
       volFound = true;
@@ -270,11 +228,9 @@ export const parseComicMetadata = (
     }
 
     if (volFound && issueFound) break;
-
   }
 
   return info;
-  
 };
 
 export const parseSynopsis = (pageContent: string | undefined): string => {

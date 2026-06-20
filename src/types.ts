@@ -435,20 +435,27 @@ export interface Wiki {
   getPageByTitle: (title: string, flags?: WikiPageFlags) => Promise<WikiPage | null>;
   getPagesByCategory: (category: string) => Promise<WikiPage[]>;
   getPageContent: {
-    (pageId: number, contentOptions: {
-      structured: true;
-    }): Promise<Record<string, string>>;
+    (
+      pageId: number,
+      contentOptions: {
+        structured: true;
+      },
+    ): Promise<Record<string, string>>;
     (pageId: number, contentOptions?: WikiContentOptions): Promise<string | undefined>;
   };
-  getCategoryMembers: (categoryTitle: string) => Promise<Array<{
-    pageid: number;
-    ns: number;
-    title: string;
-  }>>;
+  getCategoryMembers: (categoryTitle: string) => Promise<
+    Array<{
+      pageid: number;
+      ns: number;
+      title: string;
+    }>
+  >;
   searchCategories: (query: string) => Promise<string[]>;
-  getCategoriesFromPage: (pageId: number) => Promise<{
-    ns: number;
-    title: string;
-  }[]>;
+  getCategoriesFromPage: (pageId: number) => Promise<
+    {
+      ns: number;
+      title: string;
+    }[]
+  >;
   clearCache: () => void;
 }
