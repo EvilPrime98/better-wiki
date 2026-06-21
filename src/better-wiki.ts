@@ -1019,7 +1019,10 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     return page?.revisions[0]?.slots.main['*'];
   }
 
-  const getPagesByCategory = async (category: string, flags: WikiPageFlags = {}): Promise<WikiPage[]> => {
+  const getPagesByCategory = async (
+    category: string,
+    flags: WikiPageFlags = {},
+  ): Promise<WikiPage[]> => {
     const members = await getCategoryMembers(category);
     if (!members.length) return [];
 
