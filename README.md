@@ -81,7 +81,7 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 | `getPage(query, flags?)`                       | `WikiPage[]` — full-text search results                   |
 | `getPageById(pageId, flags?)`                  | `WikiPage \| null`                                        |
 | `getPageByTitle(title, flags?)`                | `WikiPage \| null`                                        |
-| `getPagesByCategory(category)`                 | `WikiPage[]`                                              |
+| `getPagesByCategory(category, flags?)`          | `WikiPage[]`                                              |
 | `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext                      |
 | `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox                 |
 | `getCategoryMembers(categoryTitle)`            | `Array<{ pageid, ns, title }>`                            |
