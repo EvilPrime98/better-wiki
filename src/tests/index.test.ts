@@ -254,7 +254,7 @@ describe('getPagesByCategory', () => {
     expect(result).toHaveLength(2);
 
     const urls = fetchMock.mock.calls.map((c) => new URL(c[0] as string));
-    const batchCalls = urls.filter((u) => u.searchParams.get('prop') === 'info|categories');
+    const batchCalls = urls.filter((u) => u.searchParams.get('prop') === 'info|categories|pageimages');
     expect(batchCalls).toHaveLength(1);
     expect(batchCalls[0]!.searchParams.get('pageids')).toBe('1|2');
   });
@@ -280,6 +280,44 @@ describe('getPagesByCategory', () => {
 
     const result = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X');
     expect(result.map((p) => p.id)).toEqual([10, 20]);
+  });
+
+  it('populates thumbnail from the batch response', async () => {
+    const src =
+      'https://static.wikia.nocookie.net/dc/images/batman.jpg/revision/latest/scale-to-width-down/400/batman.jpg';
+    fetchMock
+      .mockResolvedValueOnce(membersResponse([{ pageid: 1, ns: 0, title: 'Batman' }]))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: { '1': { pageid: 1, ns: 0, title: 'Batman', categories: [], thumbnail: { source: src } } },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(parseResponse())
+      .mockResolvedValueOnce(revisionsResponse(1, 'Batman'));
+
+    const [page] = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X');
+    expect(page!.thumbnail).toBe(src.replace('/scale-to-width-down/400', ''));
+  });
+
+  it('scales thumbnail URL when thumbnailSize flag is passed', async () => {
+    const src =
+      'https://static.wikia.nocookie.net/dc/images/batman.jpg/revision/latest/scale-to-width-down/400/batman.jpg';
+    fetchMock
+      .mockResolvedValueOnce(membersResponse([{ pageid: 1, ns: 0, title: 'Batman' }]))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: { '1': { pageid: 1, ns: 0, title: 'Batman', categories: [], thumbnail: { source: src } } },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(parseResponse())
+      .mockResolvedValueOnce(revisionsResponse(1, 'Batman'));
+
+    const [page] = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X', { thumbnailSize: 200 });
+    expect(page!.thumbnail).toBe(src.replace('scale-to-width-down/400', 'scale-to-width-down/200'));
   });
 });
 
