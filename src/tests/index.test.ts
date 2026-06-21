@@ -402,11 +402,44 @@ const pageByIdResponse = (
   pageid: number,
   title: string,
   categories: { ns: number; title: string }[] = [],
+  thumbnail?: string,
 ) =>
   jsonResponse({
     continue: { clcontinue: '', continue: '' },
-    query: { pages: { [String(pageid)]: { pageid, ns: 0, title, index: 0, categories } } },
+    query: {
+      pages: {
+        [String(pageid)]: {
+          pageid,
+          ns: 0,
+          title,
+          index: 0,
+          categories,
+          ...(thumbnail ? { thumbnail: { source: thumbnail } } : {}),
+        },
+      },
+    },
     limit: {},
+  });
+
+const pageByTitleResponse = (
+  title: string,
+  pageid = 42,
+  categories: { ns: number; title: string }[] = [],
+  thumbnail?: string,
+) =>
+  jsonResponse({
+    query: {
+      pages: {
+        [String(pageid)]: {
+          pageid,
+          ns: 0,
+          title,
+          canonicalUrl: `https://dc.fandom.com/wiki/${title}`,
+          categories,
+          ...(thumbnail ? { thumbnail: { source: thumbnail } } : {}),
+        },
+      },
+    },
   });
 
 describe('getPageById', () => {
@@ -440,6 +473,62 @@ describe('getPageById', () => {
       category: ['Category:Heroes'],
     });
     expect(page!.id).toBe(42);
+  });
+
+  it('populates thumbnail from API response', async () => {
+    fetchMock.mockResolvedValue(pageByIdResponse(42, 'Batman', [], BASE_THUMBNAIL));
+    const page = await wiki('https://dc.fandom.com').getPageById(42);
+    expect(page!.thumbnail).toBe(BASE_THUMBNAIL.replace('/scale-to-width-down/400', ''));
+  });
+
+  it('scales thumbnail URL when thumbnailSize flag is passed', async () => {
+    fetchMock.mockResolvedValue(pageByIdResponse(42, 'Batman', [], BASE_THUMBNAIL));
+    const page = await wiki('https://dc.fandom.com').getPageById(42, { thumbnailSize: 200 });
+    expect(page!.thumbnail).toBe(
+      BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'),
+    );
+  });
+});
+
+describe('getPageByTitle', () => {
+  it('returns null when page is not found', async () => {
+    fetchMock.mockResolvedValue(pageByTitleResponse('Batman', -1));
+    expect(await wiki('https://dc.fandom.com').getPageByTitle('Batman')).toBeNull();
+  });
+
+  it('returns a WikiPage with correct id and title', async () => {
+    fetchMock.mockResolvedValue(pageByTitleResponse('Batman'));
+    const page = await wiki('https://dc.fandom.com').getPageByTitle('Batman');
+    expect(page!.id).toBe(42);
+    expect(page!.title).toBe('Batman');
+    expect(page!.thumbnail).toBe('');
+  });
+
+  it('returns null when required category is absent', async () => {
+    fetchMock.mockResolvedValue(
+      pageByTitleResponse('Batman', 42, [{ ns: 14, title: 'Category:Heroes' }]),
+    );
+    expect(
+      await wiki('https://dc.fandom.com').getPageByTitle('Batman', {
+        category: ['Category:Villains'],
+      }),
+    ).toBeNull();
+  });
+
+  it('populates thumbnail from API response', async () => {
+    fetchMock.mockResolvedValue(pageByTitleResponse('Batman', 42, [], BASE_THUMBNAIL));
+    const page = await wiki('https://dc.fandom.com').getPageByTitle('Batman');
+    expect(page!.thumbnail).toBe(BASE_THUMBNAIL.replace('/scale-to-width-down/400', ''));
+  });
+
+  it('scales thumbnail URL when thumbnailSize flag is passed', async () => {
+    fetchMock.mockResolvedValue(pageByTitleResponse('Batman', 42, [], BASE_THUMBNAIL));
+    const page = await wiki('https://dc.fandom.com').getPageByTitle('Batman', {
+      thumbnailSize: 200,
+    });
+    expect(page!.thumbnail).toBe(
+      BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'),
+    );
   });
 });
 
