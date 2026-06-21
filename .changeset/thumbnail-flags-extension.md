@@ -1,5 +1,5 @@
 ---
-"better-wiki": minor
+'better-wiki': minor
 ---
 
 Extend thumbnail support to `getPageById`, `getPageByTitle`, and `getPagesByCategory`.

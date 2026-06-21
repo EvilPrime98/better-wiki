@@ -1021,49 +1021,52 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
 
   const getPagesByCategory = async (
     category: string,
-    flags: WikiPageFlags = {},
+    flags: Omit<WikiPageFlags, 'category'> = {},
   ): Promise<WikiPage[]> => {
     const members = await getCategoryMembers(category);
     if (!members.length) return [];
-
-    const categoriesByPageId = new Map<number, { ns: number; title: string }[]>();
     const canonicalUrlByPageId = new Map<number, string>();
     const thumbnailByPageId = new Map<number, string>();
+    const chunks = chunkArray(members.map((m) => m.pageid));
 
-    for (const chunk of chunkArray(members.map((m) => m.pageid))) {
-      const url = buildApiUrl({
-        action: 'query',
-        pageids: chunk.join('|'),
-        prop: 'info|categories|pageimages',
-        inprop: 'url',
-        cllimit: 'max',
-        piprop: 'thumbnail',
-        pithumbsize: '400',
-      });
-      const data = await getCachedOrFetch<WikiSearchGeneratorResponse>(url);
-      for (const [id, page] of Object.entries(data.query.pages)) {
-        categoriesByPageId.set(Number(id), page.categories ?? []);
-        canonicalUrlByPageId.set(
-          Number(id),
-          (page as unknown as { canonicalurl: string }).canonicalurl ?? '',
-        );
-        thumbnailByPageId.set(
-          Number(id),
-          (page as unknown as { thumbnail?: { source: string } }).thumbnail?.source ?? '',
-        );
-      }
-    }
+    await Promise.all(
+      chunks.map(async (chunk) => {
+        const url = buildApiUrl({
+          action: 'query',
+          pageids: chunk.join('|'),
+          prop: 'info|pageimages',
+          inprop: 'url',
+          piprop: 'thumbnail',
+          pithumbsize: '400',
+        });
 
-    return members.map((member) =>
-      buildPage({
-        thumbnail: scaleUrl(thumbnailByPageId.get(member.pageid) ?? '', flags.thumbnailSize),
-        categories: categoriesByPageId.get(member.pageid) ?? [],
-        canonicalUrl: canonicalUrlByPageId.get(member.pageid) ?? '',
-        pageid: member.pageid,
-        ns: member.ns,
-        title: member.title,
-        index: 0,
+        const data = await getCachedOrFetch<WikiSearchGeneratorResponse>(url);
+
+        for (const [id, page] of Object.entries(data.query.pages)) {
+          canonicalUrlByPageId.set(
+            Number(id),
+            (page as unknown as { canonicalurl: string }).canonicalurl ?? '',
+          );
+          thumbnailByPageId.set(
+            Number(id),
+            (page as unknown as { thumbnail?: { source: string } }).thumbnail?.source ?? '',
+          );
+        }
       }),
+    );
+
+    return Promise.all(
+      members.map(async (member) =>
+        buildPage({
+          thumbnail: scaleUrl(thumbnailByPageId.get(member.pageid) ?? '', flags.thumbnailSize),
+          categories: await getCategoriesFromPage(member.pageid),
+          canonicalUrl: canonicalUrlByPageId.get(member.pageid) ?? '',
+          pageid: member.pageid,
+          ns: member.ns,
+          title: member.title,
+          index: 0,
+        }),
+      ),
     );
   };
 
@@ -1084,6 +1087,11 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     });
 
     const data = await getCachedOrFetch<{
+      batchcomplete: string;
+      continue: {
+        cmcontinue: string;
+        continue: string;
+      };
       query: {
         categorymembers: Array<{
           pageid: number;

@@ -436,7 +436,10 @@ export interface Wiki {
   getPage: (query: string, flags?: WikiPageFlags) => Promise<WikiPage[]>;
   getPageById: (pageId: number, flags?: WikiPageFlags) => Promise<WikiPage | null>;
   getPageByTitle: (title: string, flags?: WikiPageFlags) => Promise<WikiPage | null>;
-  getPagesByCategory: (category: string, flags?: WikiPageFlags) => Promise<WikiPage[]>;
+  getPagesByCategory: (
+    category: string,
+    flags?: Omit<WikiPageFlags, 'category'>,
+  ) => Promise<WikiPage[]>;
   getThumbnailById: (pageId: number, width?: number) => Promise<string>;
   getPageContent: {
     (
