@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VERSION, wiki } from '../better-wiki.js';
+import { isGeneratorPageItem } from '../predicates.types.js';
 
 type FetchStub = ReturnType<typeof vi.fn>;
 
@@ -614,5 +615,136 @@ describe('getThumbnailById', () => {
     expect(url.searchParams.get('pithumbsize')).toBe('400');
     expect(url.searchParams.get('pageids')).toBe('42');
     expect(url.searchParams.get('piprop')).toBe('thumbnail');
+  });
+});
+
+describe('isGeneratorPageItem', () => {
+  it('returns true for a valid page item', () => {
+    expect(isGeneratorPageItem({ pageid: 1, title: 'Batman', categories: [] })).toBe(true);
+  });
+
+  it('returns false when missing field is present', () => {
+    expect(isGeneratorPageItem({ pageid: -1, title: 'X', missing: '', categories: [] })).toBe(
+      false,
+    );
+  });
+
+  it('returns false when categories field is absent', () => {
+    expect(isGeneratorPageItem({ pageid: 1, title: 'Batman' })).toBe(false);
+  });
+
+  it('returns false for null', () => {
+    expect(isGeneratorPageItem(null)).toBe(false);
+  });
+
+  it('returns false for a non-object', () => {
+    expect(isGeneratorPageItem('string')).toBe(false);
+  });
+});
+
+const comicWikitextResponse = (pageid: number, title: string, wikitext: string) =>
+  jsonResponse({
+    query: {
+      pages: {
+        [String(pageid)]: {
+          pageid,
+          title,
+          revisions: [{ slots: { main: { '*': wikitext } } }],
+        },
+      },
+    },
+  });
+
+const comicMembersResponse = (members: { pageid: number; ns: number; title: string }[]) =>
+  jsonResponse({ query: { categorymembers: members } });
+
+const comicPageInfoResponse = (
+  pages: Record<string, { pageid: number; canonicalurl?: string; thumbnail?: { source: string } }>,
+) => jsonResponse({ query: { pages } });
+
+const comicCategoriesResponse = (
+  pageid: number,
+  title: string,
+  categories: { ns: number; title: string }[] = [],
+) =>
+  jsonResponse({
+    batchcomplete: '',
+    query: { pages: { [String(pageid)]: { pageid, ns: 0, title, categories } } },
+    limits: { categories: 500 },
+  });
+
+describe('wiki plugin system', () => {
+  it('throws for an unknown plugin', () => {
+    // @ts-expect-error intentional bad plugin name
+    expect(() => wiki({ plugin: 'nonexistent' })).toThrow(/Unknown plugin/);
+  });
+
+  it('dc-fandom plugin exposes getComic and getVolume alongside base Wiki methods', () => {
+    const client = wiki({ plugin: 'dc-fandom' });
+    expect(typeof client.getPage).toBe('function');
+    expect(typeof client.clearCache).toBe('function');
+    expect(typeof client.getComic).toBe('function');
+    expect(typeof client.getVolume).toBe('function');
+    expect(typeof client.getComicById).toBe('function');
+    expect(typeof client.getVolumeById).toBe('function');
+  });
+
+  it('dc-fandom plugin targets https://dc.fandom.com', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ query: { search: [] } }));
+    await wiki({ plugin: 'dc-fandom' }).searchCategories('batman');
+    const url = new URL(fetchMock.mock.calls[0]![0] as string);
+    expect(url.origin).toBe('https://dc.fandom.com');
+  });
+
+  it('getComicById returns null when page is not found', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ continue: {}, query: { pages: {} }, limit: {} }));
+    const result = await wiki({ plugin: 'dc-fandom' }).getComicById(999);
+    expect(result).toBeNull();
+  });
+
+  it('getComicById returns a WikiComic with correct title and pageId', async () => {
+    const wikitext = '{{ComicInfobox\n| Volume = 1\n| Issue = 7\n| Writer1_1 = Grant Morrison\n}}';
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          continue: { clcontinue: '', continue: '' },
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman Vol 1 7',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+          limit: {},
+        }),
+      )
+      .mockResolvedValueOnce(comicWikitextResponse(42, 'Batman Vol 1 7', wikitext));
+
+    const comic = await wiki({ plugin: 'dc-fandom' }).getComicById(42);
+    expect(comic).not.toBeNull();
+    expect(comic!.title).toBe('Batman Vol 1 7');
+    expect(comic!.pageId).toBe(42);
+    expect(comic!.volume).toBe('1');
+    expect(comic!.issue).toBe('7');
+    expect(comic!.credits.writers).toContain('Grant Morrison');
+  });
+
+  it('getComic with multiple:true returns empty array when no pages found', async () => {
+    // getPage internal calls: generator search → returns empty
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        batchcomplete: '',
+        continue: { gsroffset: 0, continue: '' },
+        query: { pages: {} },
+      }),
+    );
+    const result = await wiki({ plugin: 'dc-fandom' }).getComic('Unknown Comic #999', {
+      multiple: true,
+    });
+    expect(result).toEqual([]);
   });
 });
