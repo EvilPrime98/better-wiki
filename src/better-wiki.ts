@@ -918,7 +918,7 @@ export function wiki(
     if (!data?.query) return [];
     const pages = data.query.pages;
 
-    const wikiPages = await Promise.all(
+    let wikiPages = await Promise.all(
       Object.values(pages).map(async (page) => {
         const pageWithCateg = {
           ...page,
@@ -939,9 +939,17 @@ export function wiki(
 
     if (flags.category !== undefined && flags.category.length > 0) {
       const targetCategories = flags.category;
-      return wikiPages.filter((wikipage) => {
+      wikiPages = wikiPages.filter((wikipage) => {
         const categories = wikipage.categories;
         return targetCategories.every((cat) => categories.includes(cat));
+      });
+    }
+
+    if (flags.categoriesOr !== undefined && flags.categoriesOr.length > 0) {
+      const targetCategories = flags.categoriesOr;
+      wikiPages = wikiPages.filter((wikipage) => {
+        const categories = wikipage.categories;
+        return targetCategories.some((cat) => categories.includes(cat));
       });
     }
 
@@ -950,7 +958,7 @@ export function wiki(
 
   const getPageById = async (
     pageId: number,
-    flags: WikiPageFlags = {},
+    flags: Omit<WikiPageFlags, 'category'> = {},
   ): Promise<WikiPage | null> => {
     const url = buildApiUrl({
       action: 'query',
@@ -965,12 +973,6 @@ export function wiki(
 
     const page = data.query.pages[String(pageId)];
     if (!page) return null;
-
-    const targetCategories = flags.category;
-    if (targetCategories?.length) {
-      const targetSet = new Set(targetCategories);
-      if (!(page.categories ?? []).some((cat) => targetSet.has(cat.title))) return null;
-    }
 
     const rawPage = page as unknown as { thumbnail?: { source: string } };
     if (!isGeneratorPageItem(page)) return null;

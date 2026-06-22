@@ -425,6 +425,7 @@ export interface ComicExtras {
 
 export interface WikiPageFlags {
   category?: string[];
+  categoriesOr?: string[];
   thumbnailSize?: number;
 }
 
@@ -434,7 +435,7 @@ export interface WikiContentOptions {
 
 export interface Wiki {
   getPage: (query: string, flags?: WikiPageFlags) => Promise<WikiPage[]>;
-  getPageById: (pageId: number, flags?: WikiPageFlags) => Promise<WikiPage | null>;
+  getPageById: (pageId: number, flags?: Omit<WikiPageFlags, 'category'>) => Promise<WikiPage | null>;
   getPageByTitle: (title: string, flags?: WikiPageFlags) => Promise<WikiPage | null>;
   getPagesByCategory: (
     category: string,

@@ -1,4 +1,5 @@
 import type { Wiki, WikiPage } from '../types';
+import Fuse from 'fuse.js';
 
 export interface WikiAppearanceEntry {
   name: string;
@@ -124,94 +125,45 @@ export function dcFandomPlugin(wikiClient: Wiki) {
   };
 
   const selectBest = (
-    candidates: {
-      page: WikiPage;
-      content: WikiStrContent;
-    }[],
+    candidates: { page: WikiPage; content: WikiStrContent }[],
     nQuery: string,
     queryYear?: string,
-  ):
-    | {
-        page: WikiPage;
-        content: WikiStrContent;
-      }
-    | undefined => {
+  ): { page: WikiPage; content: WikiStrContent } | undefined => {
     if (candidates.length === 0) return undefined;
 
-    const normalize = (s: string) => {
-      return s
-        .toLowerCase()
-        .replace(/[\W_]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    };
+    const normalize = (s: string) =>
+      s.toLowerCase().replace(/[\W_]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-    const tokenize = (s: string) => {
-      return normalize(s).split(' ').filter(Boolean);
-    };
+    const fuse = new Fuse(candidates, {
+      keys: ['page.title'],
+      threshold: 0.4,
+      includeScore: true,
+    });
 
-    const queryNorm = normalize(nQuery);
-    const queryTokens = new Set(tokenize(nQuery));
+    const fuzzyResults = fuse.search(nQuery);
+    if (fuzzyResults.length === 0) return undefined;
+
     const queryNumber = nQuery.match(/(\d+)$/)?.[1];
 
-    const scoreCandidate = (c: { page: WikiPage; content: WikiStrContent }) => {
-      const titleNorm = normalize(c.page.title);
-      const titleTokens = tokenize(c.page.title);
-      let score = 0;
+    const scored = fuzzyResults.map((r) => {
+      const { page, content } = r.item;
+      let score = (1 - (r.score ?? 1)) * 100;
 
-      //exact title
-      if (titleNorm === queryNorm) {
-        score += 100;
-      }
+      if (queryYear && content['Year'] === queryYear) score += 40;
 
-      //prefix match
-      if (titleNorm.startsWith(queryNorm)) {
-        score += 60;
-      }
-
-      //token overlap
-      let overlap = 0;
-      for (const t of titleTokens) {
-        if (queryTokens.has(t)) overlap++;
-      }
-      score += overlap * 15;
-
-      //contains full query
-      if (titleNorm.includes(queryNorm)) {
-        score += 10;
-      }
-
-      //year matching
-      const year = c.content['Year'];
-      if (queryYear && year === queryYear) {
-        score += 40;
-      }
-
-      //month/day recency bias
-      const month = parseInt(c.content['Month'] ?? '0', 10);
-      const day = parseInt(c.content['Day'] ?? '0', 10);
       if (!queryYear) {
-        score += month * 0.5;
-        score += day * 0.1;
+        score += parseInt(content['Month'] ?? '0', 10) * 0.5;
+        score += parseInt(content['Day'] ?? '0', 10) * 0.1;
       }
 
-      //number suffix matching
-      if (queryNumber) {
-        const normalizedTitle = normalize(c.page.title);
-        if (new RegExp(`\\b${queryNumber}\\b`).test(normalizedTitle)) {
-          score += 25;
-        }
+      if (queryNumber && new RegExp(`\\b${queryNumber}\\b`).test(normalize(page.title))) {
+        score += 25;
       }
 
-      return { c, score };
-    };
+      return { item: r.item, score };
+    });
 
-    const ranked = candidates
-      .map(scoreCandidate)
-      .filter((c) => !isNaN(c.score))
-      .sort((a, b) => b.score - a.score);
-
-    return ranked[0]?.c;
+    return scored.sort((a, b) => b.score - a.score)[0]?.item;
   };
 
   const collectSequential = (content: WikiStrContent, keyFn: (i: number) => string): string[] => {
@@ -407,8 +359,8 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   //PUBLIC INTERFACE
 
-  async function getComic(query: string, flags?: { multiple?: false }): Promise<WikiComic | null>;
-  async function getComic(query: string, flags: { multiple: true }): Promise<WikiComic[]>;
+  async function getComic(query: string, flags?: { multiple?: false; thumbnailSize?: number }): Promise<WikiComic | null>;
+  async function getComic(query: string, flags: { multiple: true; thumbnailSize?: number }): Promise<WikiComic[]>;
   async function getComic(
     query: string,
     flags: WikiFandomFlags = {},
@@ -416,7 +368,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     const nQuery = preNormalization(query);
 
     const pages = await wikiClient.getPage(nQuery, {
-      category: ['Category:Comics'],
+      categoriesOr: ['Category:Comics', 'Category:Collected Editions'],
       ...(flags.thumbnailSize !== undefined ? { thumbnailSize: flags.thumbnailSize } : {}),
     });
 
@@ -453,8 +405,8 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiComicBuilder(page, pageStrContent);
   };
 
-  async function getVolume(query: string, flags: { multiple?: false }): Promise<WikiVolume | null>;
-  async function getVolume(query: string, flags: { multiple: true }): Promise<WikiVolume[]>;
+  async function getVolume(query: string, flags?: { multiple?: false; thumbnailSize?: number }): Promise<WikiVolume | null>;
+  async function getVolume(query: string, flags: { multiple: true; thumbnailSize?: number }): Promise<WikiVolume[]>;
   async function getVolume(
     query: string,
     flags: WikiFandomFlags = {},

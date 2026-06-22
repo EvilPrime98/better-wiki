@@ -428,25 +428,6 @@ describe('getPageById', () => {
     expect(page!.thumbnail).toBe('');
   });
 
-  it('returns null when required category is absent', async () => {
-    fetchMock.mockResolvedValue(
-      pageByIdResponse(42, 'Batman', [{ ns: 14, title: 'Category:Heroes' }]),
-    );
-    expect(
-      await wiki('https://dc.fandom.com').getPageById(42, { category: ['Category:Villains'] }),
-    ).toBeNull();
-  });
-
-  it('returns the page when required category matches', async () => {
-    fetchMock.mockResolvedValue(
-      pageByIdResponse(42, 'Batman', [{ ns: 14, title: 'Category:Heroes' }]),
-    );
-    const page = await wiki('https://dc.fandom.com').getPageById(42, {
-      category: ['Category:Heroes'],
-    });
-    expect(page!.id).toBe(42);
-  });
-
   it('populates thumbnail from API response', async () => {
     fetchMock.mockResolvedValue(pageByIdResponse(42, 'Batman', [], BASE_THUMBNAIL));
     const page = await wiki('https://dc.fandom.com').getPageById(42);
