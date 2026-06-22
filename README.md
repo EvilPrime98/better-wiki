@@ -131,6 +131,49 @@ Raw page shape returned by the search generator (before `WikiPage` is constructe
 | `getPageContent()`       | `string \| undefined` — raw wikitext                      |
 | `getStructuredContent()` | `Record<string, string>` — first infobox template, parsed |
 
+## Plugins
+
+Plugins extend the base `Wiki` client with domain-specific methods. Pass `{ plugin }` instead of a URL — the plugin supplies the target wiki URL automatically.
+
+```ts
+import { wiki } from 'better-wiki';
+
+const dc = wiki({ plugin: 'dc-fandom' });
+
+// Fetch a comic by search query (picks the best match)
+const comic = await dc.getComic('Batman #700 (2010)');
+console.log(comic.credits.writers, comic.appearing.featuredCharacters);
+
+// Fetch by page ID
+const comicById = await dc.getComicById(123456);
+
+// Fetch a volume
+const volume = await dc.getVolume('Batman Vol 1');
+const volumeById = await dc.getVolumeById(789);
+
+// Multiple results
+const allMatches = await dc.getComic('Batman', { multiple: true });
+```
+
+All base `Wiki` methods (`getPage`, `clearCache`, etc.) remain available on the returned client.
+
+### `dc-fandom` plugin
+
+Targets `https://dc.fandom.com`. Adds:
+
+| Method                                  | Returns              | Description                       |
+| --------------------------------------- | -------------------- | --------------------------------- |
+| `getComic(query, flags?)`               | `WikiComic \| null`  | Best-match comic by search query  |
+| `getComic(query, { multiple: true })`   | `WikiComic[]`        | All matching comics               |
+| `getComicById(pageId, flags?)`          | `WikiComic \| null`  | Comic by MediaWiki page ID        |
+| `getVolume(query, flags?)`              | `WikiVolume \| null` | Best-match volume by search query |
+| `getVolume(query, { multiple: true })`  | `WikiVolume[]`       | All matching volumes              |
+| `getVolumeById(pageId, thumbnailSize?)` | `WikiVolume \| null` | Volume by MediaWiki page ID       |
+
+Pass `flags.thumbnailSize` (number, px) to scale cover thumbnail URLs.
+
+All returned types (`WikiComic`, `WikiVolume`, `WikiCredits`, `WikiAppearingSection`, etc.) are exported from the package root for use in your own type annotations.
+
 ## Development
 
 ```bash
