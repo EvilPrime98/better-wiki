@@ -1,5 +1,6 @@
 export const VERSION = '0.0.0';
 
+import { isGeneratorPageItem } from './predicates.types';
 import type {
   WikiPageImagesResponse,
   WikiRevisionsResponse,
@@ -34,6 +35,7 @@ import type {
 } from './types';
 
 import { chunkArray, getInnerText } from './utils';
+import { PLUGINS, type PluginName, type PluginReturn } from './plugins/index';
 
 export {
   WikiPageImagesResponse,
@@ -64,7 +66,29 @@ const DEFAULT_OPTIONS: Required<WikiOptions> = {
   debug: false,
 };
 
-export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
+export function wiki<K extends PluginName>(
+  options: WikiOptions & { plugin: K },
+): Wiki & PluginReturn<K>;
+export function wiki(url: string, options?: WikiOptions): Wiki;
+export function wiki(
+  urlOrOptions: string | (WikiOptions & { plugin?: PluginName }),
+  baseOptions: WikiOptions = {},
+): Wiki | (Wiki & object) {
+  let wikiUrl: string;
+  let options: WikiOptions;
+  let pluginName: PluginName | undefined;
+
+  if (typeof urlOrOptions === 'string') {
+    wikiUrl = urlOrOptions;
+    options = baseOptions;
+  } else {
+    const { plugin: key, ...rest } = urlOrOptions;
+    if (!key || !(key in PLUGINS)) throw new Error(`Unknown plugin: "${key}"`);
+    pluginName = key;
+    wikiUrl = PLUGINS[key].url;
+    options = rest;
+  }
+
   //CONFIG
 
   const config: Required<WikiOptions> = { ...DEFAULT_OPTIONS, ...options };
@@ -891,6 +915,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
       };
     }>(url);
 
+    if (!data?.query) return [];
     const pages = data.query.pages;
 
     const wikiPages = await Promise.all(
@@ -948,6 +973,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     }
 
     const rawPage = page as unknown as { thumbnail?: { source: string } };
+    if (!isGeneratorPageItem(page)) return null;
     return buildPage({
       ...page,
       thumbnail: scaleUrl(rawPage.thumbnail?.source ?? '', flags.thumbnailSize),
@@ -1174,7 +1200,7 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     return result;
   };
 
-  return {
+  const base: Wiki = {
     getPage,
     getPageById,
     getPageByTitle,
@@ -1186,4 +1212,9 @@ export function wiki(wikiUrl: string, options: WikiOptions = {}): Wiki {
     getThumbnailById: getThumbnail,
     clearCache: () => apiCache.clear(),
   };
+
+  if (pluginName) {
+    return { ...base, ...PLUGINS[pluginName].factory(base) };
+  }
+  return base;
 }
