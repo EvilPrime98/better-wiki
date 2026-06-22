@@ -1,5 +1,13 @@
 # better-wiki
 
+## 0.4.0
+
+### Minor Changes
+
+- aa951e5: Extend thumbnail support to `getPageById`, `getPageByTitle`, and `getPagesByCategory`.
+
+  All three methods now accept `flags.thumbnailSize` and populate the `WikiPage.thumbnail` field from the API response, consistent with `getPage`.
+
 ## 0.3.0
 
 ### Minor Changes
