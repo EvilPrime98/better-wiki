@@ -435,7 +435,10 @@ export interface WikiContentOptions {
 
 export interface Wiki {
   getPage: (query: string, flags?: WikiPageFlags) => Promise<WikiPage[]>;
-  getPageById: (pageId: number, flags?: Omit<WikiPageFlags, 'category'>) => Promise<WikiPage | null>;
+  getPageById: (
+    pageId: number,
+    flags?: Omit<WikiPageFlags, 'category'>,
+  ) => Promise<WikiPage | null>;
   getPageByTitle: (title: string, flags?: WikiPageFlags) => Promise<WikiPage | null>;
   getPagesByCategory: (
     category: string,

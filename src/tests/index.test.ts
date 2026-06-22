@@ -547,6 +547,52 @@ describe('getPage', () => {
     expect(pages).toHaveLength(1);
     expect(pages[0]!.title).toBe('Batman');
   });
+
+  it('filters results by categoriesOr when flags.categoriesOr is provided', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        searchPageResponse({
+          '1': { pageid: 1, ns: 0, title: 'Batman', index: 0 },
+          '2': { pageid: 2, ns: 0, title: 'Joker', index: 1 },
+          '3': { pageid: 3, ns: 0, title: 'Alfred', index: 2 },
+        }),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': {
+            pageid: 1,
+            ns: 0,
+            title: 'Batman',
+            categories: [{ ns: 14, title: 'Category:Heroes' }],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '2': {
+            pageid: 2,
+            ns: 0,
+            title: 'Joker',
+            categories: [{ ns: 14, title: 'Category:Villains' }],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '3': {
+            pageid: 3,
+            ns: 0,
+            title: 'Alfred',
+            categories: [{ ns: 14, title: 'Category:Supporting' }],
+          },
+        }),
+      );
+    const pages = await wiki('https://dc.fandom.com').getPage('dc', {
+      categoriesOr: ['Category:Heroes', 'Category:Villains'],
+    });
+    expect(pages).toHaveLength(2);
+    expect(pages.map((p) => p.title)).toEqual(['Batman', 'Joker']);
+  });
 });
 
 const thumbnailApiResponse = (pageid: number, thumbnailSource?: string) =>

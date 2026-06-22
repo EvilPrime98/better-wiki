@@ -94,7 +94,8 @@ Pass `flags` to any page-fetching method to filter or augment results:
 
 | Flag            | Type       | Description                                                               |
 | --------------- | ---------- | ------------------------------------------------------------------------- |
-| `category`      | `string[]` | Filter results to pages belonging to all listed categories.               |
+| `category`      | `string[]` | Filter results to pages belonging to **all** listed categories (AND).     |
+| `categoriesOr`  | `string[]` | Filter results to pages belonging to **any** listed category (OR).        |
 | `thumbnailSize` | `number`   | Scale thumbnail URLs to this width (px) when building `WikiPage` results. |
 
 ### `WikiPage` properties

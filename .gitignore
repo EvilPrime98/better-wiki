@@ -10,3 +10,4 @@ CLAUDE.md
 .claude/
 project/
 proof.ts
+bun.lock

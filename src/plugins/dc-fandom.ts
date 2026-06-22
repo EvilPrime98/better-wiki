@@ -132,7 +132,11 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     if (candidates.length === 0) return undefined;
 
     const normalize = (s: string) =>
-      s.toLowerCase().replace(/[\W_]+/g, ' ').replace(/\s+/g, ' ').trim();
+      s
+        .toLowerCase()
+        .replace(/[\W_]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
     const fuse = new Fuse(candidates, {
       keys: ['page.title'],
@@ -359,8 +363,14 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   //PUBLIC INTERFACE
 
-  async function getComic(query: string, flags?: { multiple?: false; thumbnailSize?: number }): Promise<WikiComic | null>;
-  async function getComic(query: string, flags: { multiple: true; thumbnailSize?: number }): Promise<WikiComic[]>;
+  async function getComic(
+    query: string,
+    flags?: { multiple?: false; thumbnailSize?: number },
+  ): Promise<WikiComic | null>;
+  async function getComic(
+    query: string,
+    flags: { multiple: true; thumbnailSize?: number },
+  ): Promise<WikiComic[]>;
   async function getComic(
     query: string,
     flags: WikiFandomFlags = {},
@@ -405,8 +415,14 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiComicBuilder(page, pageStrContent);
   };
 
-  async function getVolume(query: string, flags?: { multiple?: false; thumbnailSize?: number }): Promise<WikiVolume | null>;
-  async function getVolume(query: string, flags: { multiple: true; thumbnailSize?: number }): Promise<WikiVolume[]>;
+  async function getVolume(
+    query: string,
+    flags?: { multiple?: false; thumbnailSize?: number },
+  ): Promise<WikiVolume | null>;
+  async function getVolume(
+    query: string,
+    flags: { multiple: true; thumbnailSize?: number },
+  ): Promise<WikiVolume[]>;
   async function getVolume(
     query: string,
     flags: WikiFandomFlags = {},
