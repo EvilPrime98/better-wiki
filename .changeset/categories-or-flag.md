@@ -2,10 +2,9 @@
 'better-wiki': minor
 ---
 
-Add `categoriesOr` flag for OR-based category filtering, migrate dc-fandom scorer to fuse.js.
+Add getCategoryMembers pagination, getCharacterAppearances, and getComic category flags.
 
-- `WikiPageFlags` now accepts `categoriesOr: string[]` — filters pages matching **any** of the listed categories (OR). The existing `category` flag retains AND semantics.
-- Removes `category` from `getPageById` flags (filtering a page you already have by ID is a no-op).
-- `getComic` now matches `Category:Collected Editions` in addition to `Category:Comics`.
-- `getComic` and `getVolume` overloads now expose `thumbnailSize` in their typed signatures.
-- Replaces hand-rolled fuzzy scorer in dc-fandom with fuse.js, preserving year, recency-bias, and number-suffix boosters.
+- `getCategoryMembers` now follows MediaWiki continuation tokens, returning all members across pages instead of only the first 500.
+- `dcFandomPlugin` exposes `getCharacterAppearances(characterTitle, { sorted })` — fetches all comics from a character's Appearances category, with optional chronological sort.
+- `getComic` accepts two new flags: `includeCollections` (also matches `Category:Collected Editions`) and `categoriesIn` (AND-filters results to pages in all listed categories).
+- `WikiPageFlags` fields now carry JSDoc describing `category` (AND), `categoriesOr` (OR), and `thumbnailSize` semantics.
