@@ -424,8 +424,17 @@ export interface ComicExtras {
 }
 
 export interface WikiPageFlags {
+  /**
+   * Result must be a member of `all` of these categories.
+   */
   category?: string[];
+  /**
+   * Result must be a member of at least `ONE` of these categories.
+   */
   categoriesOr?: string[];
+  /**
+   * Width of image elements in pixels. Default is `original`.
+   */
   thumbnailSize?: number;
 }
 

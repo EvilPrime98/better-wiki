@@ -1,4 +1,4 @@
-export const VERSION = '0.0.0';
+export const VERSION = '0.5.0';
 
 import { isGeneratorPageItem } from './predicates.types';
 import type {
@@ -368,485 +368,27 @@ export function wiki(
     return scaleUrl(Object.values(pages)[0]?.thumbnail?.source || '', width);
   };
 
-  //IMPLEMENTATIONS - TODO DELETE
-
-  // const getCoverImage = async (
-  //     pageIdentifier: string | number
-  // ) => {
-  //     const url = buildApiUrl({
-  //         action: 'query',
-  //         pageids: String(pageIdentifier),
-  //         prop: 'pageimages',
-  //         piprop: 'original',
-  //     });
-  //     const data = await getCachedOrFetch<WikiPageImagesResponse>(url);
-  //     return data.query.pages;
-  // };
-
-  // const getMultiplePageContents = async (
-  //     pageIds: number[],
-  // ): Promise<Map<number, string | undefined>> => {
-
-  //     const url = buildApiUrl({
-  //         action: 'query',
-  //         pageids: pageIds.join('|'),
-  //         prop: 'revisions',
-  //         rvprop: 'content',
-  //         rvslots: 'main',
-  //     });
-
-  //     const data = await getCachedOrFetch<WikiRevisionsResponse>(url);
-
-  //     const result = new Map<number, string | undefined>();
-
-  //     for (const [id, page] of Object.entries(data.query.pages)) {
-  //         result.set(Number(id), page.revisions?.[0]?.slots.main['*']);
-  //     }
-
-  //     return result;
-
-  // };
-
-  // const getCredits = async ({
-  //     pageId,
-  //     pageContent,
-  // }: {
-  //     pageId?: number;
-  //     pageContent?: string | undefined;
-  // }): Promise<ComicCredits> => {
-
-  //     if (!pageContent) {
-  //         if (!pageId) throw new Error('No pageId provided.');
-  //         pageContent = await getPageContent(pageId);
-  //     }
-
-  //     return parseCredits(pageContent);
-
-  // };
-
-  // const getComicMetadata = async ({
-  //     pageId,
-  //     pageContent,
-  // }: {
-  //     pageId?: number;
-  //     pageContent?: string | undefined;
-  // }): Promise<{ volume: string; issue: string }> => {
-
-  //     if (!pageContent) {
-  //         if (!pageId) throw new Error('No pageId provided.');
-  //         pageContent = await getPageContent(pageId);
-  //     }
-
-  //     return parseComicMetadata(pageContent);
-
-  // };
-
-  // const getSynopsis = async ({
-  //     pageId,
-  //     pageContent,
-  // }: {
-  //     pageId?: number;
-  //     pageContent?: string | undefined;
-  // }): Promise<string> => {
-
-  //     if (!pageContent) {
-  //         if (!pageId) throw new Error('No pageId provided.');
-  //         pageContent = await getPageContent(pageId);
-  //     }
-
-  //     return parseSynopsis(pageContent);
-
-  // };
-
-  // const getComicInfo = async (query: string): Promise<ComicInfo> => {
-
-  //     const normalizedQuery = normalizeQueryString(query);
-
-  //     const year = extractYear(query);
-
-  //     const url = buildApiUrl({
-  //         action: 'query',
-  //         list: 'search',
-  //         srsearch: normalizedQuery,
-  //         srnamespace: '0',
-  //         srlimit: '10',
-  //         srwhat: 'text',
-  //     });
-
-  //     const data = await getCachedOrFetch<WikiSearchResponse>(url);
-
-  //     const results = data.query.search;
-
-  //     if (!results || results.length === 0) {
-  //         return {
-  //             error: true,
-  //             message: `No comics found for query: ${query}`,
-  //         };
-  //     }
-
-  //     const allContents = await getMultiplePageContents(results.map((r) => r.pageid));
-
-  //     const rawResultsData = results.map((r) => {
-  //         const pageContent = allContents.get(r.pageid);
-  //         const titleTokens = r.title.trim().replace(/\s+/g, ' ').toLocaleLowerCase().split(' ');
-  //         const keyDivIndex = titleTokens.findIndex((token) => token.includes('vol'));
-  //         const volume = titleTokens[keyDivIndex + 1];
-  //         const issue = Number(titleTokens[keyDivIndex + 2]);
-  //         const releaseDate = parseReleaseDate(pageContent);
-  //         return {
-  //             pageid: r.pageid,
-  //             title: r.title,
-  //             releaseDate,
-  //             content: pageContent,
-  //             volume,
-  //             issue,
-  //         };
-  //     });
-
-  //     const releaseDateByPageId = new Map(rawResultsData.map((r) => [r.pageid, r.releaseDate]));
-
-  //     const contentByPageId = new Map(rawResultsData.map((r) => [r.pageid, r.content]));
-
-  //     let best = results[0]!;
-
-  //     if (!year) {
-
-  //         const withDates = results
-  //             .map((r) => ({
-  //                 result: r,
-  //                 releaseDate: {
-  //                     releaseYear: releaseDateByPageId.get(r.pageid)?.releaseYear ?? '0',
-  //                     releaseMonth: releaseDateByPageId.get(r.pageid)?.releaseMonth ?? '0',
-  //                     releaseDay: releaseDateByPageId.get(r.pageid)?.releaseDay ?? '0',
-  //                 },
-  //             }))
-  //             .sort((a, b) => {
-  //                 const r1 = parseInt(b.releaseDate.releaseYear) - parseInt(a.releaseDate.releaseYear);
-  //                 if (r1 !== 0) return r1;
-  //                 const r2 = parseInt(b.releaseDate.releaseMonth) - parseInt(a.releaseDate.releaseMonth);
-  //                 if (r2 !== 0) return r2;
-  //                 const r3 = parseInt(b.releaseDate.releaseDay) - parseInt(a.releaseDate.releaseDay);
-  //                 if (r3 !== 0) return r3;
-  //                 return a.result.title.localeCompare(b.result.title);
-  //             });
-
-  //         best = withDates[0]!.result;
-
-  //     } else {
-
-  //         const queryNumber = normalizedQuery.match(/(\d+)$/)?.[1];
-
-  //         const withMeta = results.map((r) => ({
-  //             result: r,
-  //             yearMatches: releaseDateByPageId.get(r.pageid)?.releaseYear === year,
-  //             numberMatches: queryNumber ? normalizeQueryString(r.title).endsWith(queryNumber) : false,
-  //         }));
-
-  //         const exactMatch = withMeta.find((r) => r.numberMatches && r.yearMatches);
-  //         const numberMatch = withMeta.find((r) => r.numberMatches);
-  //         const yearMatch = withMeta.find((r) => r.yearMatches);
-
-  //         best = (exactMatch ?? numberMatch ?? yearMatch ?? withMeta[0]!).result;
-
-  //     }
-
-  //     const bestData = rawResultsData.find((r) => r.pageid === best.pageid);
-  //     const bestPageContent = contentByPageId.get(best.pageid);
-  //     const extras = getComicExtras(bestPageContent || '');
-  //     const appearing = getAppearing(bestPageContent || '');
-  //     const [covers, credits, synopsis, metadata] = await Promise.all([
-  //         getCoverImage(best.pageid),
-  //         getCredits({ pageContent: bestPageContent }),
-  //         getSynopsis({ pageContent: bestPageContent }),
-  //         getComicMetadata({ pageContent: bestPageContent }),
-  //     ]);
-
-  //     const coverVariants = extras?.coverVariants?.length ? await resolveVariantImageUrls(extras.coverVariants) : undefined;
-
-  //     return {
-  //         error: false,
-  //         message: 'OK',
-  //         title: best.title,
-  //         releaseDate: bestData?.releaseDate ?? undefined,
-  //         volume: metadata.volume,
-  //         issue: metadata.issue,
-  //         cover: removeCoverRevision(covers[best.pageid]?.original?.source ?? null),
-  //         pageId: best.pageid,
-  //         credits: credits ?? undefined,
-  //         synopsis,
-  //         rating: extras?.rating || undefined,
-  //         event: extras?.event || undefined,
-  //         storyTitles: extras?.storyTitles?.length ? extras.storyTitles : undefined,
-  //         appearing: appearing ?? undefined,
-  //         quotation: {
-  //             quote: extras?.quotation || undefined,
-  //             speaker: extras?.speaker || undefined,
-  //         },
-  //         coverVariants,
-  //         notes: extras?.notes.length ? extras.notes : undefined,
-  //         trivia: extras?.trivia.length ? extras.trivia : undefined,
-  //     };
-  // };
-
-  // const getComicExact = async (
-  //     title: string,
-  //     volume: string,
-  //     issue: string,
-  // ): Promise<ComicInfo> => {
-
-  //     const pageTitle = buildComicPageTitle(title, volume, issue);
-
-  //     const url = buildApiUrl({
-  //         action: 'query',
-  //         titles: pageTitle,
-  //         prop: 'pageimages|revisions',
-  //         piprop: 'original',
-  //         rvprop: 'content',
-  //         rvslots: 'main',
-  //     });
-
-  //     const data = await getCachedOrFetch<ExactPageResponse>(url);
-  //     const pages = data.query.pages;
-  //     const pageKey = Object.keys(pages)[0]!;
-
-  //     if (pageKey === '-1') {
-  //         return {
-  //             error: true,
-  //             message: `No comic found for: ${pageTitle}`,
-  //         };
-  //     }
-
-  //     const page = pages[pageKey]!;
-  //     const pageContent = page.revisions?.[0]?.slots.main['*'];
-  //     const extras = getComicExtras(pageContent || '');
-  //     const appearing = getAppearing(pageContent || '');
-  //     const releaseDate = parseReleaseDate(pageContent);
-  //     const credits = parseCredits(pageContent);
-  //     const metadata = parseComicMetadata(pageContent);
-  //     const synopsis = parseSynopsis(pageContent);
-
-  //     const coverVariants = extras?.coverVariants?.length ? await resolveVariantImageUrls(extras.coverVariants) : undefined;
-
-  //     return {
-  //         error: false,
-  //         message: 'OK',
-  //         title: page.title,
-  //         releaseDate: releaseDate ?? undefined,
-  //         volume: metadata.volume,
-  //         issue: metadata.issue,
-  //         cover: removeCoverRevision(page.original?.source ?? null),
-  //         pageId: page.pageid,
-  //         credits: credits ?? undefined,
-  //         synopsis,
-  //         rating: extras?.rating || undefined,
-  //         event: extras?.event || undefined,
-  //         storyTitles: extras?.storyTitles?.length ? extras.storyTitles : undefined,
-  //         appearing: appearing ?? undefined,
-  //         quotation: {
-  //             speaker: extras?.speaker || undefined,
-  //             quote: extras?.quotation || undefined,
-  //         },
-  //         coverVariants,
-  //         notes: extras?.notes.length ? extras.notes : undefined,
-  //         trivia: extras?.trivia.length ? extras.trivia : undefined,
-  //     };
-
-  // };
-
-  // const getSeries = async (
-  //     prefix: string,
-  // ): Promise<{
-  //     error: boolean;
-  //     message: string;
-  //     comics?: Comic[];
-  //     seriesData?: SeriesData;
-  // }> => {
-
-  //     const normalizedPrefix = normalizeTitle(prefix);
-
-  //     const url = buildApiUrl({
-  //         action: 'query',
-  //         list: 'allpages',
-  //         apprefix: normalizedPrefix,
-  //         aplimit: '500',
-  //     });
-
-  //     const data = await getCachedOrFetch<WikiAllPagesResponse>(url);
-  //     const sortedPages = data.query.allpages.sort((a, b) => a.pageid - b.pageid);
-  //     const pageChunks = chunkArray(sortedPages);
-  //     const chunkOffsets = pageChunks.reduce<number[]>((acc, _chunk, i) => {
-  //         acc.push(i === 0 ? 0 : acc[i - 1]! + pageChunks[i - 1]!.length);
-  //         return acc;
-  //     }, []);
-
-  //     const resolvedChunks = await Promise.all(
-  //         pageChunks.map(async (chunk, chunkIndex) => {
-  //             const [coverImages, pageContents] = await Promise.all([
-  //                 getCoverImage(chunk.map((p) => p.pageid).join('|')),
-  //                 getMultiplePageContents(chunk.map((p) => p.pageid)),
-  //             ]);
-
-  //             if (!coverImages) {
-  //                 throw new Error('Error fetching cover images.');
-  //             }
-
-  //             return chunk.map((page, indexInChunk) => {
-  //                 const titleTokens = page.title.trim().replace(/\s+/g, ' ').toLocaleLowerCase().split(' ');
-
-  //                 const volIndex = titleTokens.findIndex((token) => token.includes('vol'));
-  //                 if (volIndex === -1) {
-  //                     debug(`Could not parse vol from title: "${page.title}"`);
-  //                     return;
-  //                 }
-
-  //                 const seriesVolume = titleTokens[volIndex + 1];
-  //                 const titleName = capitalize(titleTokens.slice(0, volIndex).join(' '));
-  //                 const titleIssue = Number(titleTokens[volIndex + 2]);
-
-  //                 if (isNaN(titleIssue)) {
-  //                     debug(`Could not parse issue number from title: "${page.title}"`);
-  //                     return;
-  //                 }
-
-  //                 const releaseDate = parseReleaseDate(pageContents.get(page.pageid));
-
-  //                 return {
-  //                     comic: {
-  //                         title: `${titleName} #${titleIssue}`,
-  //                         link: `${WIKI_BASE_URL}/${normalizeTitle(page.title, false)}`,
-  //                         index: chunkOffsets[chunkIndex]! + indexInChunk,
-  //                         cover: removeCoverRevision(coverImages[page.pageid]?.original?.source ?? null),
-  //                         releaseDate: `${releaseDate.releaseMonth}-${releaseDate.releaseDay}-${releaseDate.releaseYear}`,
-  //                     } satisfies Comic,
-  //                     seriesVolume,
-  //                     releaseYear: Number(releaseDate.releaseYear),
-  //                 };
-  //             });
-  //         }),
-  //     );
-
-  //     const flat = resolvedChunks.flat();
-  //     const definedFlat = flat.filter((r): r is NonNullable<typeof r> => r !== undefined);
-  //     const comics = definedFlat.map((r) => r.comic);
-  //     const releaseYears = [...new Set(definedFlat.map((r) => r.releaseYear))].sort((a, b) => a - b);
-  //     const seriesVolume = definedFlat[0]?.seriesVolume;
-
-  //     return {
-  //         error: false,
-  //         message: 'OK',
-  //         comics: comics.sort((a, b) => a.index - b.index),
-  //         seriesData: {
-  //             name: (normalizedPrefix.replaceAll('_', ' ').split('Vol')[0] ?? '').trim(),
-  //             publisher: config.publisher,
-  //             seriesVolume: seriesVolume ?? null,
-  //             dates:
-  //                 releaseYears.length > 0
-  //                     ? `${releaseYears[0]}-${releaseYears[releaseYears.length - 1]}`
-  //                     : 'unknown',
-  //             refName: '',
-  //             wikiRef: `${WIKI_BASE_URL}/${normalizedPrefix}`,
-  //             searchUrl: url,
-  //             totalFound: comics.length,
-  //         },
-  //     };
-  // };
-
-  // const getComic = async ({
-  //     query,
-  //     title,
-  //     volume,
-  //     issue,
-  // }: {
-  //     query?: string;
-  //     title?: string;
-  //     volume?: string;
-  //     issue?: string;
-  // }) => {
-  //     if (query) return await getComicInfo(query);
-  //     if (title && volume && issue) return await getComicExact(title, volume, issue);
-  //     return null;
-  // };
-
-  // const getCharacterAppearances = async ({
-  //     query,
-  // }: {
-  //     query: string;
-  // }): Promise<{
-  //     error: boolean;
-  //     message: string;
-  //     match?: string | undefined;
-  //     appearances?: CharacterAppearance[];
-  // }> => {
-
-  //     const allCategories = await searchCategories(query);
-  //     const match = allCategories.filter((t) => t.toLowerCase().includes('appearances'));
-
-  //     if (!match.length) throw new Error('No category matches the search.');
-
-  //     const url = buildApiUrl({
-  //         action: 'query',
-  //         list: 'categorymembers',
-  //         cmtitle: match[0]!,
-  //         cmlimit: '500',
-  //     });
-
-  //     const data = await getCachedOrFetch<WikiCategoryMembersResponse>(url);
-  //     const members = data.query.categorymembers;
-  //     const membersChunks = chunkArray(members);
-  //     const appearances = [] as Appearance[];
-
-  //     for (const chunk of membersChunks) {
-  //         const pageIds = chunk.map((comic) => comic.pageid).join('|');
-
-  //         const [pagesWithUrls, pagesCovers, pageContents] = await Promise.all([
-  //             getPageUrls(pageIds),
-  //             getCoverImage(pageIds),
-  //             getMultiplePageContents(chunk.map((c) => c.pageid)),
-  //         ]);
-
-  //         if (!pagesWithUrls || !pagesCovers) {
-  //             throw new Error('Error fetching page information.');
-  //         }
-
-  //         const appearancesChunk = chunk.map((comic, index) => ({
-  //             pageId: comic.pageid,
-  //             title: comic.title,
-  //             url: pagesWithUrls?.[comic.pageid]?.fullurl,
-  //             link: `${WIKI_BASE_URL}/${normalizeTitle(comic.title, false)}`,
-  //             index,
-  //             cover: removeCoverRevision(pagesCovers[comic.pageid]?.original?.source ?? null),
-  //             releaseDate: parseReleaseDate(pageContents.get(comic.pageid)),
-  //         })) as Appearance[];
-
-  //         appearances.push(...appearancesChunk);
-  //     }
-
-  //     return {
-  //         error: false,
-  //         message: 'OK',
-  //         match: match[0],
-  //         appearances: sortAppearances(normalizeDates(appearances)),
-  //     };
-
-  // };
-
-  // const getPageUrls = async (
-  //     pageIds: string,
-  // ): Promise<WikiPageInfoResponse['query']['pages'] | null> => {
-
-  //     const url = buildApiUrl({
-  //         action: 'query',
-  //         pageids: pageIds,
-  //         prop: 'info',
-  //         inprop: 'url',
-  //         cmlimit: '500',
-  //     });
-
-  //     const data = await getCachedOrFetch<WikiPageInfoResponse>(url);
-
-  //     return data.query.pages;
-
-  // };
+  const getMultiplePageContents = async (
+    pageIds: number[],
+  ): Promise<Map<number, string | undefined>> => {
+    const url = buildApiUrl({
+      action: 'query',
+      pageids: pageIds.join('|'),
+      prop: 'revisions',
+      rvprop: 'content',
+      rvslots: 'main',
+    });
+
+    const data = await getCachedOrFetch<WikiRevisionsResponse>(url);
+
+    const result = new Map<number, string | undefined>();
+
+    for (const [id, page] of Object.entries(data.query.pages)) {
+      result.set(Number(id), page.revisions?.[0]?.slots.main['*']);
+    }
+
+    return result;
+  };
 
   //BUILDERS
 
@@ -1107,6 +649,12 @@ export function wiki(
       title: string;
     }>
   > => {
+    const returnable: {
+      pageid: number;
+      ns: number;
+      title: string;
+    }[] = [];
+
     const url = buildApiUrl({
       action: 'query',
       list: 'categorymembers',
@@ -1114,22 +662,32 @@ export function wiki(
       cmlimit: '500',
     });
 
-    const data = await getCachedOrFetch<{
+    type CategoryMembersResponse = {
       batchcomplete: string;
-      continue: {
-        cmcontinue: string;
-        continue: string;
-      };
-      query: {
-        categorymembers: Array<{
-          pageid: number;
-          ns: number;
-          title: string;
-        }>;
-      };
-    }>(url);
+      continue?: { cmcontinue: string; continue: string };
+      query: { categorymembers: Array<{ pageid: number; ns: number; title: string }> };
+    };
 
-    return data.query.categorymembers;
+    let data = await getCachedOrFetch<CategoryMembersResponse>(url);
+
+    returnable.push(...data.query.categorymembers);
+
+    while (data.continue !== undefined) {
+      data = await getCachedOrFetch<CategoryMembersResponse>(
+        buildApiUrl({
+          action: 'query',
+          list: 'categorymembers',
+          cmtitle: categoryTitle,
+          cmlimit: '500',
+          cmcontinue: data.continue.cmcontinue,
+          continue: data.continue.continue,
+        }),
+      );
+
+      returnable.push(...data.query.categorymembers);
+    }
+
+    return returnable;
   };
 
   const searchCategories = async (query: string): Promise<string[]> => {

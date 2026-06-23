@@ -96,6 +96,8 @@ export interface WikiVolume {
 interface WikiFandomFlags {
   thumbnailSize?: number;
   multiple?: boolean;
+  includeCollections?: boolean;
+  categoriesIn?: string[];
 }
 
 export function dcFandomPlugin(wikiClient: Wiki) {
@@ -365,20 +367,31 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   async function getComic(
     query: string,
-    flags?: { multiple?: false; thumbnailSize?: number },
+    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: false },
   ): Promise<WikiComic | null>;
   async function getComic(
     query: string,
-    flags: { multiple: true; thumbnailSize?: number },
+    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: true },
   ): Promise<WikiComic[]>;
   async function getComic(
     query: string,
     flags: WikiFandomFlags = {},
   ): Promise<WikiComic[] | WikiComic | null> {
     const nQuery = preNormalization(query);
+    const categoriesOr: string[] = ['Category:Comics'];
+    const categories: string[] = [];
+
+    if (flags.includeCollections) {
+      categoriesOr.push('Category:Collected Editions');
+    }
+
+    if (flags.categoriesIn && flags.categoriesIn.length > 0) {
+      categories.push(...flags.categoriesIn);
+    }
 
     const pages = await wikiClient.getPage(nQuery, {
-      categoriesOr: ['Category:Comics', 'Category:Collected Editions'],
+      category: categories,
+      categoriesOr,
       ...(flags.thumbnailSize !== undefined ? { thumbnailSize: flags.thumbnailSize } : {}),
     });
 
@@ -470,10 +483,37 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiVolumeBuilder(page, content);
   };
 
+  const getCharacterAppearances = async (
+    characterTitle: string,
+    flags: { sorted: boolean },
+  ): Promise<WikiComic[]> => {
+    const pageIds = (
+      await wikiClient.getCategoryMembers(`Category:${characterTitle}/Appearances`)
+    ).map((t) => t.pageid);
+
+    const comics = (await Promise.all(pageIds.map((id) => getComicById(id)))).filter(
+      (c): c is WikiComic => c !== null,
+    );
+
+    if (flags.sorted === true) {
+      return comics.toSorted((a, b) => {
+        const r1 = Number(a?.releaseDate.releaseYear) - Number(b?.releaseDate.releaseYear);
+        if (r1 !== 0) return r1;
+        const r2 = Number(a?.releaseDate.releaseMonth) - Number(b?.releaseDate.releaseMonth);
+        if (r2 !== 0) return r2;
+        const r3 = Number(a?.releaseDate.releaseDay) - Number(b?.releaseDate.releaseDay);
+        return r3;
+      });
+    }
+
+    return comics;
+  };
+
   return {
     getComic,
     getComicById,
     getVolume,
     getVolumeById,
+    getCharacterAppearances,
   };
 }
