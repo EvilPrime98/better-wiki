@@ -93,12 +93,65 @@ export interface WikiVolume {
   issueList: string[];
 }
 
-interface WikiFandomFlags {
+export interface WikiCharacterHistorySection {
+  heading: string;
+  text: string;
+}
+
+export interface WikiCharacter {
+  name: string;
+  image: string;
+  pageId: number;
+  realName: string;
+  mainAlias: string;
+  aliases: string[];
+  alignment: string;
+  identity: string;
+  affiliation: string;
+  relatives: string;
+  universe: string;
+  baseOfOperations: string;
+  alienRace: string;
+  gender: string;
+  height: string;
+  weight: string;
+  eyes: string;
+  hair: string;
+  citizenship: string;
+  maritalStatus: string;
+  occupation: string;
+  creators: string[];
+  first: string;
+  last: string;
+  quotation?: { quote?: string; speaker?: string; source?: string };
+  overview: string;
+  history: WikiCharacterHistorySection[];
+  powers: string[];
+  abilities: string[];
+  weaknesses: string[];
+  equipment: string[];
+  transportation: string[];
+  weapons: string[];
+  notes: string[];
+  trivia: string[];
+  getAppearances(flags?: Pick<WikiFandomFlags, 'sorted'>): Promise<WikiComic[]>;
+}
+
+export interface WikiFandomFlags {
   thumbnailSize?: number;
   multiple?: boolean;
   includeCollections?: boolean;
   categoriesIn?: string[];
+  sorted?: boolean;
 }
+
+const byReleaseDate = (a: WikiComic, b: WikiComic): number => {
+  const r1 = Number(a.releaseDate.releaseYear) - Number(b.releaseDate.releaseYear);
+  if (r1 !== 0) return r1;
+  const r2 = Number(a.releaseDate.releaseMonth) - Number(b.releaseDate.releaseMonth);
+  if (r2 !== 0) return r2;
+  return Number(a.releaseDate.releaseDay) - Number(b.releaseDate.releaseDay);
+};
 
 export function dcFandomPlugin(wikiClient: Wiki) {
   const APPEARING_SECTIONS: Record<string, keyof WikiAppearingSection> = {
@@ -290,6 +343,42 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return r;
   };
 
+  const stripWiki = (s: string): string => {
+    return s
+      .replace(/<ref[^>]*>.*?<\/ref>/gs, '')
+      .replace(/<ref[^>]*\/>/g, '')
+      .replace(/<!--.*?-->/gs, '')
+      .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m: string, t: string, l?: string) =>
+        (l ?? t).trim(),
+      )
+      .replace(/'''?/g, '')
+      .trim();
+  };
+
+  const splitAliases = (raw?: string): string[] => {
+    return (raw ?? '')
+      .split(/;?\s*<br\s*\/?>|;/i)
+      .map((a) => stripWiki(a))
+      .filter(Boolean);
+  };
+
+  const parseHistory = (raw?: string): WikiCharacterHistorySection[] => {
+    if (!raw) return [];
+    const sections: WikiCharacterHistorySection[] = [];
+    let current: WikiCharacterHistorySection = { heading: '', text: '' };
+    for (const line of raw.split('\n')) {
+      const header = line.trim().match(/^={2,}\s*(.+?)\s*={2,}$/);
+      if (header) {
+        if (current.heading || current.text.trim()) sections.push(current);
+        current = { heading: stripWiki(header[1]!), text: '' };
+      } else {
+        current.text += (current.text ? '\n' : '') + line;
+      }
+    }
+    if (current.heading || current.text.trim()) sections.push(current);
+    return sections.map((s) => ({ ...s, text: s.text.trim() }));
+  };
+
   //BUILDERS
 
   const wikiComicBuilder = (page: WikiPage | undefined, content: WikiStrContent): WikiComic => {
@@ -363,6 +452,64 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     };
   };
 
+  const wikiCharacterBuilder = (
+    page: WikiPage | undefined,
+    content: WikiStrContent,
+  ): WikiCharacter => {
+    return {
+      name: page?.title ?? '',
+      image: content['Image']?.replace(/<!--.*?-->/gs, '').trim() ?? '',
+      pageId: page?.id ?? -1,
+      realName: content['RealName'] ?? '',
+      mainAlias: content['MainAlias'] ?? '',
+      aliases: splitAliases(content['Aliases']),
+      alignment: stripWiki(content['Alignment'] ?? ''),
+      identity: content['Identity'] ?? '',
+      affiliation: content['Affiliation'] ?? '',
+      relatives: content['Relatives'] ?? '',
+      universe: content['Universe'] ?? '',
+      baseOfOperations: content['BaseOfOperations'] ?? '',
+      alienRace: content['AlienRace'] ?? '',
+      gender: content['Gender'] ?? '',
+      height: content['Height'] ?? '',
+      weight: content['Weight'] ?? '',
+      eyes: content['Eyes'] ?? '',
+      hair: content['Hair'] ?? '',
+      citizenship: content['Citizenship'] ?? '',
+      maritalStatus: content['MaritalStatus'] ?? '',
+      occupation: content['Occupation'] ?? '',
+      creators:
+        content['Creators']
+          ?.split(';')
+          .map((c) => c.trim())
+          .filter(Boolean) ?? [],
+      first: content['First'] ?? '',
+      last: content['Last'] ?? '',
+      ...(content['Quotation'] || content['Speaker'] || content['QuoteSource']
+        ? {
+            quotation: {
+              ...(content['Quotation'] ? { quote: content['Quotation'] } : {}),
+              ...(content['Speaker'] ? { speaker: content['Speaker'] } : {}),
+              ...(content['QuoteSource'] ? { source: content['QuoteSource'] } : {}),
+            },
+          }
+        : {}),
+      overview: content['Overview'] ?? '',
+      history: parseHistory(content['HistoryText']),
+      powers: parseBullets(content['Powers']),
+      abilities: parseBullets(content['Abilities']),
+      weaknesses: parseBullets(content['Weaknesses']),
+      equipment: parseBullets(content['Equipment']),
+      transportation: parseBullets(content['Transportation']),
+      weapons: parseBullets(content['Weapons']),
+      notes: parseBullets(content['Notes']),
+      trivia: parseBullets(content['Trivia']),
+      getAppearances(flags: Pick<WikiFandomFlags, 'sorted'> = {}): Promise<WikiComic[]> {
+        return getCharacterAppearances(page?.title ?? '', flags);
+      },
+    };
+  };
+
   //PUBLIC INTERFACE
 
   async function getComic(
@@ -371,7 +518,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
   ): Promise<WikiComic | null>;
   async function getComic(
     query: string,
-    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: true },
+    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: true; sorted?: boolean },
   ): Promise<WikiComic[]>;
   async function getComic(
     query: string,
@@ -404,7 +551,8 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
     if (flags.multiple === true) {
       if (pages.length === 0) return [];
-      return candidates.map((c) => wikiComicBuilder(c.page, c.content));
+      const comics = candidates.map((c) => wikiComicBuilder(c.page, c.content));
+      return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
     }
 
     const queryYear = extractYear(query);
@@ -483,9 +631,60 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiVolumeBuilder(page, content);
   };
 
+  async function getCharacter(
+    query: string,
+    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: false },
+  ): Promise<WikiCharacter | null>;
+  async function getCharacter(
+    query: string,
+    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: true },
+  ): Promise<WikiCharacter[]>;
+  async function getCharacter(
+    query: string,
+    flags: WikiFandomFlags = {},
+  ): Promise<WikiCharacter[] | WikiCharacter | null> {
+    const nQuery = preNormalization(query);
+
+    const pages = await wikiClient.getPage(nQuery, {
+      category: flags.categoriesIn ?? [],
+      categoriesOr: ['Category:Characters'],
+      ...(flags.thumbnailSize !== undefined ? { thumbnailSize: flags.thumbnailSize } : {}),
+    });
+
+    const candidates = await Promise.all(
+      pages.map(async (p) => ({
+        page: p,
+        content: ((await p.getStructuredContent()) ?? {}) as WikiStrContent,
+      })),
+    );
+
+    if (flags.multiple === true) {
+      if (pages.length === 0) return [];
+      return candidates.map((c) => wikiCharacterBuilder(c.page, c.content));
+    }
+
+    if (pages.length === 0) return null;
+    const best = selectBest(candidates, nQuery, extractYear(query));
+    if (!best) return null;
+    return wikiCharacterBuilder(best.page, best.content);
+  }
+
+  const getCharacterById = async (
+    pageId: number,
+    flags: WikiFandomFlags = {},
+  ): Promise<WikiCharacter | null> => {
+    const page = await wikiClient.getPageById(
+      pageId,
+      flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {},
+    );
+    if (!page) return null;
+    const content = (await page.getStructuredContent()) as WikiStrContent;
+    return wikiCharacterBuilder(page, content);
+  };
+
   const getCharacterAppearances = async (
     characterTitle: string,
-    flags: { sorted: boolean },
+    flags: Pick<WikiFandomFlags, 'sorted'> = {},
   ): Promise<WikiComic[]> => {
     const pageIds = (
       await wikiClient.getCategoryMembers(`Category:${characterTitle}/Appearances`)
@@ -495,18 +694,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       (c): c is WikiComic => c !== null,
     );
 
-    if (flags.sorted === true) {
-      return comics.toSorted((a, b) => {
-        const r1 = Number(a?.releaseDate.releaseYear) - Number(b?.releaseDate.releaseYear);
-        if (r1 !== 0) return r1;
-        const r2 = Number(a?.releaseDate.releaseMonth) - Number(b?.releaseDate.releaseMonth);
-        if (r2 !== 0) return r2;
-        const r3 = Number(a?.releaseDate.releaseDay) - Number(b?.releaseDate.releaseDay);
-        return r3;
-      });
-    }
-
-    return comics;
+    return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
   };
 
   return {
@@ -514,6 +702,8 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     getComicById,
     getVolume,
     getVolumeById,
+    getCharacter,
+    getCharacterById,
     getCharacterAppearances,
   };
 }
