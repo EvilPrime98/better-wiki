@@ -162,15 +162,20 @@ All base `Wiki` methods (`getPage`, `clearCache`, etc.) remain available on the 
 
 Targets `https://dc.fandom.com`. Adds:
 
-| Method                                       | Returns              | Description                                  |
-| -------------------------------------------- | -------------------- | -------------------------------------------- |
-| `getComic(query, flags?)`                    | `WikiComic \| null`  | Best-match comic by search query             |
-| `getComic(query, { multiple: true })`        | `WikiComic[]`        | All matching comics                          |
-| `getComicById(pageId, flags?)`               | `WikiComic \| null`  | Comic by MediaWiki page ID                   |
-| `getVolume(query, flags?)`                   | `WikiVolume \| null` | Best-match volume by search query            |
-| `getVolume(query, { multiple: true })`       | `WikiVolume[]`       | All matching volumes                         |
-| `getVolumeById(pageId, thumbnailSize?)`      | `WikiVolume \| null` | Volume by MediaWiki page ID                  |
-| `getCharacterAppearances(title, { sorted })` | `WikiComic[]`        | All comics in `Category:<title>/Appearances` |
+| Method                                       | Returns                 | Description                                  |
+| -------------------------------------------- | ----------------------- | -------------------------------------------- |
+| `getComic(query, flags?)`                    | `WikiComic \| null`     | Best-match comic by search query             |
+| `getComic(query, { multiple: true })`        | `WikiComic[]`           | All matching comics                          |
+| `getComicById(pageId, flags?)`               | `WikiComic \| null`     | Comic by MediaWiki page ID                   |
+| `getVolume(query, flags?)`                   | `WikiVolume \| null`    | Best-match volume by search query            |
+| `getVolume(query, { multiple: true })`       | `WikiVolume[]`          | All matching volumes                         |
+| `getVolumeById(pageId, thumbnailSize?)`      | `WikiVolume \| null`    | Volume by MediaWiki page ID                  |
+| `getCharacter(query, flags?)`                | `WikiCharacter \| null` | Best-match character by search query         |
+| `getCharacter(query, { multiple: true })`    | `WikiCharacter[]`       | All matching characters                      |
+| `getCharacterById(pageId, flags?)`           | `WikiCharacter \| null` | Character by MediaWiki page ID               |
+| `getCharacterAppearances(title, { sorted })` | `WikiComic[]`           | All comics in `Category:<title>/Appearances` |
+
+A `WikiCharacter` carries bio fields (`realName`, `aliases`, `alignment`, …), parsed `history` sections, list fields (`powers`, `abilities`, `equipment`, …), an optional `quotation`, and a `getAppearances({ sorted? })` method returning its Appearances comics.
 
 `getComic` accepts additional flags:
 
@@ -179,6 +184,7 @@ Targets `https://dc.fandom.com`. Adds:
 | `thumbnailSize`      | `number`   | Scale cover thumbnail URLs to this width (px).                                         |
 | `includeCollections` | `boolean`  | Also match pages in `Category:Collected Editions` (default: comics only).              |
 | `categoriesIn`       | `string[]` | AND-filter: result must belong to **all** listed categories in addition to the OR set. |
+| `sorted`             | `boolean`  | With `multiple: true`, return comics ordered by release date (oldest first).           |
 
 Pass `flags.thumbnailSize` (number, px) to scale cover thumbnail URLs.
 
