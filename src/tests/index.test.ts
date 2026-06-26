@@ -775,8 +775,8 @@ describe('wiki plugin system', () => {
     expect(result).toEqual([]);
   });
 
-  it('exposes getCharacterAppearances', () => {
-    expect(typeof wiki({ plugin: 'dc-fandom' }).getCharacterAppearances).toBe('function');
+  it('exposes getCharacter', () => {
+    expect(typeof wiki({ plugin: 'dc-fandom' }).getCharacter).toBe('function');
   });
 });
 
@@ -806,8 +806,79 @@ describe('getCategoryMembers (pagination)', () => {
   });
 });
 
-describe('dc-fandom getCharacterAppearances', () => {
+describe('dc-fandom character.getAppearances', () => {
   it('returns comics from the character Appearances category', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(7, 'Batman'))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(7, 'Batman', '{{Character\n| RealName = Bruce Wayne\n}}'),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: { categorymembers: [{ pageid: 42, ns: 0, title: 'Batman Vol 1 1' }] },
+        }),
+      )
+      .mockResolvedValueOnce(pageByIdResponse(42, 'Batman Vol 1 1'))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(
+          42,
+          'Batman Vol 1 1',
+          '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n| Year = 2020\n| Month = June\n| Day = 1\n}}',
+        ),
+      );
+
+    const character = await wiki({ plugin: 'dc-fandom' }).getCharacterById(7);
+    const result = await character!.getAppearances({ sorted: false });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.title).toBe('Batman Vol 1 1');
+    const membersUrl = new URL(fetchMock.mock.calls[2]![0] as string);
+    expect(membersUrl.searchParams.get('cmtitle')).toBe('Category:Batman/Appearances');
+  });
+
+  it('sorts results chronologically when sorted: true', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(7, 'Batman'))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(7, 'Batman', '{{Character\n| RealName = Bruce Wayne\n}}'),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            categorymembers: [
+              { pageid: 1, ns: 0, title: 'Batman Vol 1 1' },
+              { pageid: 2, ns: 0, title: 'Batman Vol 1 2' },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(pageByIdResponse(1, 'Batman Vol 1 1'))
+      .mockResolvedValueOnce(pageByIdResponse(2, 'Batman Vol 1 2'))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(
+          1,
+          'Batman Vol 1 1',
+          '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n| Year = 2020\n| Month = June\n| Day = 1\n}}',
+        ),
+      )
+      .mockResolvedValueOnce(
+        comicWikitextResponse(
+          2,
+          'Batman Vol 1 2',
+          '{{ComicInfobox\n| Volume = 1\n| Issue = 2\n| Year = 2019\n| Month = January\n| Day = 1\n}}',
+        ),
+      );
+
+    const character = await wiki({ plugin: 'dc-fandom' }).getCharacterById(7);
+    const result = await character!.getAppearances({ sorted: true });
+    expect(result).toHaveLength(2);
+    expect(result[0]!.releaseDate.releaseYear).toBe('2019');
+    expect(result[1]!.releaseDate.releaseYear).toBe('2020');
+  });
+});
+
+// [agent-added]
+describe('dc-fandom getCharacterAppearances (standalone)', () => {
+  it('returns comics for a title without fetching the character page first', async () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse({
@@ -828,6 +899,7 @@ describe('dc-fandom getCharacterAppearances', () => {
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.title).toBe('Batman Vol 1 1');
+    // first call is the appearances category — no character page/structured-content fetch precedes it
     const firstUrl = new URL(fetchMock.mock.calls[0]![0] as string);
     expect(firstUrl.searchParams.get('cmtitle')).toBe('Category:Batman/Appearances');
   });
@@ -867,6 +939,53 @@ describe('dc-fandom getCharacterAppearances', () => {
     expect(result).toHaveLength(2);
     expect(result[0]!.releaseDate.releaseYear).toBe('2019');
     expect(result[1]!.releaseDate.releaseYear).toBe('2020');
+  });
+});
+
+describe('dc-fandom wikiCharacterBuilder parsing', () => {
+  it('parses aliases, quotation, bullet lists, and history sections', async () => {
+    const wikitext = [
+      '{{Character',
+      '| RealName = Bruce Wayne',
+      '| Aliases = The Bat<br>The Dark Knight; Matches Malone',
+      '| Quotation = I am vengeance.',
+      '| Speaker = Batman',
+      '| Powers = * Peak human conditioning',
+      '* Master detective',
+      '| HistoryText = == Origin ==',
+      'His parents were killed.',
+      '== Career ==',
+      'He fights crime.',
+      '}}',
+    ].join('\n');
+
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(7, 'Batman'))
+      .mockResolvedValueOnce(comicWikitextResponse(7, 'Batman', wikitext));
+
+    const character = await wiki({ plugin: 'dc-fandom' }).getCharacterById(7);
+    expect(character).not.toBeNull();
+    expect(character!.realName).toBe('Bruce Wayne');
+    expect(character!.aliases).toEqual(['The Bat', 'The Dark Knight', 'Matches Malone']);
+    expect(character!.quotation).toEqual({ quote: 'I am vengeance.', speaker: 'Batman' });
+    expect(character!.powers).toEqual(['Peak human conditioning', 'Master detective']);
+    expect(character!.history).toEqual([
+      { heading: 'Origin', text: 'His parents were killed.' },
+      { heading: 'Career', text: 'He fights crime.' },
+    ]);
+  });
+
+  it('omits quotation when no quote fields are present', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(7, 'Batman'))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(7, 'Batman', '{{Character\n| RealName = Bruce Wayne\n}}'),
+      );
+
+    const character = await wiki({ plugin: 'dc-fandom' }).getCharacterById(7);
+    expect(character!.quotation).toBeUndefined();
+    expect(character!.aliases).toEqual([]);
+    expect(character!.history).toEqual([]);
   });
 });
 
