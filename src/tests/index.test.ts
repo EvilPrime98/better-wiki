@@ -28,8 +28,8 @@ const lastUrl = (): string => String(fetchMock.mock.calls.at(-1)![0]);
 const lastInit = (): RequestInit => fetchMock.mock.calls.at(-1)![1] as RequestInit;
 
 describe('VERSION', () => {
-  it('is exported as a string', () => {
-    expect(typeof VERSION).toBe('string');
+  it('is exported as a semver string', () => {
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
 
