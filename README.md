@@ -80,11 +80,13 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 | ---------------------------------------------- | --------------------------------------------------------- |
 | `getPage(query, flags?)`                       | `WikiPage[]` — full-text search results                   |
 | `getPageById(pageId, flags?)`                  | `WikiPage \| null`                                        |
+| `getPageById(pageIds[], flags?)`               | `WikiPage[]` — batch lookup by IDs                        |
 | `getPageByTitle(title, flags?)`                | `WikiPage \| null`                                        |
 | `getPagesByCategory(category, flags?)`         | `WikiPage[]`                                              |
 | `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext                      |
 | `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox                 |
-| `getCategoryMembers(categoryTitle)`            | `Array<{ pageid, ns, title }>`                            |
+| `getCategoryMembers(categoryTitle, flags?)`    | `WikiCategoryMemberItem[]`                                |
+| `getCategoryMembers(titles[], flags?)`         | `WikiCategoryMemberItem[]` — intersection across titles   |
 | `searchCategories(query)`                      | `string[]`                                                |
 | `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                                    |
 | `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px |
@@ -97,6 +99,7 @@ Pass `flags` to any page-fetching method to filter or augment results:
 | `category`      | `string[]` | Filter results to pages belonging to **all** listed categories (AND).     |
 | `categoriesOr`  | `string[]` | Filter results to pages belonging to **any** listed category (OR).        |
 | `thumbnailSize` | `number`   | Scale thumbnail URLs to this width (px) when building `WikiPage` results. |
+| `limit`         | `number`   | Cap the number of results returned (default: 20 for `getPage`).           |
 
 ### `WikiPage` properties
 
@@ -167,9 +170,11 @@ Targets `https://dc.fandom.com`. Adds:
 | `getComic(query, flags?)`                    | `WikiComic \| null`     | Best-match comic by search query             |
 | `getComic(query, { multiple: true })`        | `WikiComic[]`           | All matching comics                          |
 | `getComicById(pageId, flags?)`               | `WikiComic \| null`     | Comic by MediaWiki page ID                   |
+| `getComicById(pageIds[], flags?)`            | `WikiComic[]`           | Batch comic lookup by IDs                    |
 | `getVolume(query, flags?)`                   | `WikiVolume \| null`    | Best-match volume by search query            |
 | `getVolume(query, { multiple: true })`       | `WikiVolume[]`          | All matching volumes                         |
 | `getVolumeById(pageId, thumbnailSize?)`      | `WikiVolume \| null`    | Volume by MediaWiki page ID                  |
+| `getVolumeById(pageIds[], thumbnailSize?)`   | `WikiVolume[]`          | Batch volume lookup by IDs                   |
 | `getCharacter(query, flags?)`                | `WikiCharacter \| null` | Best-match character by search query         |
 | `getCharacter(query, { multiple: true })`    | `WikiCharacter[]`       | All matching characters                      |
 | `getCharacterById(pageId, flags?)`           | `WikiCharacter \| null` | Character by MediaWiki page ID               |
