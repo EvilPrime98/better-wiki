@@ -1,6 +1,7 @@
 export const VERSION = '0.7.0';
 
 import { isGeneratorPageItem } from './predicates.types';
+
 import type {
   WikiPageImagesResponse,
   WikiRevisionsResponse,
@@ -32,6 +33,11 @@ import type {
   WikiPageFlags,
   WikiContentOptions,
   Wiki,
+  WikiGetPageResponse,
+  WikiPageCategory,
+  CategoriesResponse,
+  WikiCategoryMemberItem,
+  CategoryMembersResponse,
 } from './types';
 
 import { chunkArray, getInnerText } from './utils';
@@ -162,7 +168,6 @@ export function wiki(
 
     return data;
   };
-
   const buildApiUrl = (params: Record<string, string>): string => {
     const urlParams = new URLSearchParams({
       format: 'json',
@@ -390,6 +395,38 @@ export function wiki(
     return result;
   };
 
+  async function membersForCategory(categoryTitle: string): Promise<WikiCategoryMemberItem[]> {
+    const returnable: WikiCategoryMemberItem[] = [];
+
+    let data = await getCachedOrFetch<CategoryMembersResponse>(
+      buildApiUrl({
+        action: 'query',
+        list: 'categorymembers',
+        cmtitle: categoryTitle,
+        cmlimit: '500',
+      }),
+    );
+
+    returnable.push(...data.query.categorymembers);
+
+    while (data.continue !== undefined) {
+      data = await getCachedOrFetch<CategoryMembersResponse>(
+        buildApiUrl({
+          action: 'query',
+          list: 'categorymembers',
+          cmtitle: categoryTitle,
+          cmlimit: '500',
+          cmcontinue: data.continue.cmcontinue,
+          continue: data.continue.continue,
+        }),
+      );
+
+      returnable.push(...data.query.categorymembers);
+    }
+
+    return returnable;
+  }
+
   //BUILDERS
 
   const buildPage = (page: WikiSearchGeneratorPageItem): WikiPage => {
@@ -412,72 +449,58 @@ export function wiki(
 
   //PUBLIC INTERFACE
 
-  const getPage = async (query: string, flags: WikiPageFlags = {}): Promise<WikiPage[]> => {
-    const url = buildApiUrl({
+  async function getPage(query: string, flags: WikiPageFlags = {}): Promise<WikiPage[]> {
+    const searchParams = {
       action: 'query',
       generator: 'search',
       gsrsearch: query,
       gsrnamespace: '0',
-      gsrlimit: '50',
-      prop: 'info|pageimages',
+      gsrlimit: flags.limit && flags.limit > 0 ? flags.limit.toString() : '20',
+      prop: 'info|pageimages|categories',
       inprop: 'url',
       piprop: 'thumbnail',
       pithumbsize: '200',
-    });
+      cllimit: 'max', //categories get truncated after 500 (in total)
+    };
 
-    const data = await getCachedOrFetch<{
-      batchcomplete: string;
-      continue: { gsroffset: number; continue: string };
-      warnings?: { query: { '*': string } };
-      query: {
-        pages: Record<
-          string,
-          {
-            pageid: number;
-            ns: number;
-            title: string;
-            index: number;
-            contentmodel: string;
-            pagelanguage: string;
-            pagelanguagehtmlcode: string;
-            pagelanguagedir: string;
-            touched: string;
-            lastrevid: number;
-            length: number;
-            fullurl: string;
-            editurl: string;
-            canonicalurl: string;
-            thumbnail: {
-              source: string;
-              width: number;
-              height: number;
-            };
-          }
-        >;
-      };
-    }>(url);
-
+    let data = await getCachedOrFetch<WikiGetPageResponse>(buildApiUrl(searchParams));
     if (!data?.query) return [];
-    const pages = data.query.pages;
+    const pages = Object.values(data.query.pages);
 
-    let wikiPages = await Promise.all(
-      Object.values(pages).map(async (page) => {
-        const pageWithCateg = {
-          ...page,
-          categories: await getCategoriesFromPage(page.pageid),
-        };
-        const builtPage = buildPage({
-          thumbnail: scaleUrl(pageWithCateg.thumbnail?.source, flags.thumbnailSize),
-          canonicalUrl: pageWithCateg.canonicalurl,
-          pageid: pageWithCateg.pageid,
-          ns: pageWithCateg.ns,
-          title: pageWithCateg.title,
-          index: pageWithCateg.index,
-          categories: pageWithCateg.categories,
-        });
-        return builtPage;
-      }),
-    );
+    while (flags.limit && pages.length < flags.limit && data.continue !== undefined) {
+      data = await getCachedOrFetch<WikiGetPageResponse>(
+        buildApiUrl({
+          ...searchParams,
+          gsroffset: String(data.continue.gsroffset),
+          continue: data.continue.continue,
+        }),
+      );
+
+      if (!data?.query) break;
+
+      pages.push(...Object.values(data.query.pages));
+    }
+
+    if (flags.limit && pages.length > flags.limit) pages.length = flags.limit;
+
+    const idsMissingCategories = pages
+      .filter((page) => !page.categories)
+      .map((page) => page.pageid);
+
+    const fetchedCategories = await getCategoriesForPages(...idsMissingCategories);
+
+    let wikiPages = pages.map((page) => {
+      const categories = page.categories ?? fetchedCategories[page.pageid]?.categories ?? [];
+      return buildPage({
+        thumbnail: scaleUrl(page.thumbnail?.source, flags.thumbnailSize),
+        canonicalUrl: page.canonicalurl,
+        pageid: page.pageid,
+        ns: page.ns,
+        title: page.title,
+        index: page.index,
+        categories,
+      });
+    });
 
     if (flags.category !== undefined && flags.category.length > 0) {
       const targetCategories = flags.category;
@@ -496,38 +519,76 @@ export function wiki(
     }
 
     return wikiPages;
-  };
+  }
 
-  const getPageById = async (
+  async function getPageById(
     pageId: number,
+    flags?: Omit<WikiPageFlags, 'category'>,
+  ): Promise<WikiPage | null>;
+  async function getPageById(
+    pageId: number[],
+    flags?: Omit<WikiPageFlags, 'category'>,
+  ): Promise<WikiPage[]>;
+  async function getPageById(
+    pageId: number | number[],
     flags: Omit<WikiPageFlags, 'category'> = {},
-  ): Promise<WikiPage | null> => {
-    const url = buildApiUrl({
-      action: 'query',
-      pageids: String(pageId),
-      prop: 'pageimages|categories',
-      cllimit: 'max',
-      piprop: 'thumbnail',
-      pithumbsize: '400',
-    });
+  ): Promise<WikiPage | null | WikiPage[]> {
+    const ids = Array.isArray(pageId) ? pageId : [pageId];
 
-    const data = await getCachedOrFetch<WikiSearchGeneratorResponse>(url);
+    const fetchChunk = async (chunk: number[]): Promise<WikiPage[]> => {
+      const returnable: WikiPage[] = [];
 
-    const page = data.query.pages[String(pageId)];
-    if (!page) return null;
+      const collect = (res: WikiSearchGeneratorResponse) => {
+        returnable.push(
+          ...Object.values(res.query.pages)
+            .filter(isGeneratorPageItem)
+            .map((page) =>
+              buildPage({
+                ...page,
+                thumbnail: scaleUrl(
+                  (page as unknown as { thumbnail?: { source: string } }).thumbnail?.source ?? '',
+                  flags.thumbnailSize,
+                ),
+              }),
+            ),
+        );
+      };
 
-    const rawPage = page as unknown as { thumbnail?: { source: string } };
-    if (!isGeneratorPageItem(page)) return null;
-    return buildPage({
-      ...page,
-      thumbnail: scaleUrl(rawPage.thumbnail?.source ?? '', flags.thumbnailSize),
-    });
-  };
+      let urlParams: Record<string, string> = {
+        action: 'query',
+        pageids: chunk.join('|'),
+        prop: 'pageimages|categories',
+        cllimit: 'max',
+        piprop: 'thumbnail',
+        pithumbsize: '400',
+      };
 
-  const getPageByTitle = async (
+      let data = await getCachedOrFetch<WikiSearchGeneratorResponse>(buildApiUrl(urlParams));
+
+      collect(data);
+
+      while (data.continue !== undefined) {
+        urlParams = {
+          ...urlParams,
+          clcontinue: data.continue.clcontinue,
+          continue: data.continue.continue,
+        };
+        data = await getCachedOrFetch<WikiSearchGeneratorResponse>(buildApiUrl(urlParams));
+        collect(data);
+      }
+
+      return returnable;
+    };
+
+    const pages = (await Promise.all(chunkArray(ids).map(fetchChunk))).flat();
+
+    return Array.isArray(pageId) ? pages : (pages[0] ?? null);
+  }
+
+  async function getPageByTitle(
     title: string,
     flags: WikiPageFlags = {},
-  ): Promise<WikiPage | null> => {
+  ): Promise<WikiPage | null> {
     const url = buildApiUrl({
       action: 'query',
       titles: title,
@@ -549,12 +610,14 @@ export function wiki(
       if (!(page.categories ?? []).some((cat) => targetSet.has(cat.title))) return null;
     }
 
-    const rawPage = page as unknown as { thumbnail?: { source: string } };
+    const rawPage = page as unknown as { thumbnail?: { source: string }; canonicalurl?: string };
+
     return buildPage({
       ...page,
+      canonicalUrl: rawPage.canonicalurl ?? '',
       thumbnail: scaleUrl(rawPage.thumbnail?.source ?? '', flags.thumbnailSize),
     });
-  };
+  }
 
   async function getPageContent(
     pageId: number,
@@ -589,10 +652,10 @@ export function wiki(
     return page?.revisions[0]?.slots.main['*'];
   }
 
-  const getPagesByCategory = async (
+  async function getPagesByCategory(
     category: string,
     flags: Omit<WikiPageFlags, 'category'> = {},
-  ): Promise<WikiPage[]> => {
+  ): Promise<WikiPage[]> {
     const members = await getCategoryMembers(category);
     if (!members.length) return [];
     const canonicalUrlByPageId = new Map<number, string>();
@@ -638,59 +701,50 @@ export function wiki(
         }),
       ),
     );
-  };
+  }
 
-  const getCategoryMembers = async (
+  async function getCategoryMembers(
     categoryTitle: string,
-  ): Promise<
-    Array<{
-      pageid: number;
-      ns: number;
-      title: string;
-    }>
-  > => {
-    const returnable: {
-      pageid: number;
-      ns: number;
-      title: string;
-    }[] = [];
+    flags?: Pick<WikiPageFlags, 'limit'>,
+  ): Promise<WikiCategoryMemberItem[]>;
+  async function getCategoryMembers(
+    categoryTitle: string[],
+    flags?: Pick<WikiPageFlags, 'limit'>,
+  ): Promise<WikiCategoryMemberItem[]>;
+  async function getCategoryMembers(
+    categoryTitle: string | string[],
+    flags: Pick<WikiPageFlags, 'limit'> = {},
+  ): Promise<WikiCategoryMemberItem[]> {
+    const titles = Array.isArray(categoryTitle) ? categoryTitle : [categoryTitle];
 
-    const url = buildApiUrl({
-      action: 'query',
-      list: 'categorymembers',
-      cmtitle: categoryTitle,
-      cmlimit: '500',
-    });
+    const firstCategory = titles[0];
+    if (!firstCategory) return [];
 
-    type CategoryMembersResponse = {
-      batchcomplete: string;
-      continue?: { cmcontinue: string; continue: string };
-      query: { categorymembers: Array<{ pageid: number; ns: number; title: string }> };
-    };
+    const initialBatch = await membersForCategory(firstCategory);
 
-    let data = await getCachedOrFetch<CategoryMembersResponse>(url);
-
-    returnable.push(...data.query.categorymembers);
-
-    while (data.continue !== undefined) {
-      data = await getCachedOrFetch<CategoryMembersResponse>(
-        buildApiUrl({
-          action: 'query',
-          list: 'categorymembers',
-          cmtitle: categoryTitle,
-          cmlimit: '500',
-          cmcontinue: data.continue.cmcontinue,
-          continue: data.continue.continue,
-        }),
-      );
-
-      returnable.push(...data.query.categorymembers);
+    if (titles.length === 1) {
+      return initialBatch;
     }
 
-    return returnable;
-  };
+    const initialBatchCategories = await getCategoriesForPages(
+      ...initialBatch.map((m) => m.pageid),
+    );
 
-  const searchCategories = async (query: string): Promise<string[]> => {
+    let initialBatchWithCategories = initialBatch.map((m) => ({
+      ...m,
+      categories: initialBatchCategories[m.pageid]?.categories ?? [],
+    }));
+
+    for (const targetCategory of titles.slice(1)) {
+      initialBatchWithCategories = initialBatchWithCategories.filter((m) => {
+        return m.categories.some((c) => c.title === targetCategory);
+      });
+    }
+
+    return initialBatchWithCategories;
+  }
+
+  async function searchCategories(query: string): Promise<string[]> {
     const url = buildApiUrl({
       action: 'query',
       list: 'search',
@@ -701,41 +755,58 @@ export function wiki(
     });
 
     const data = await getCachedOrFetch<WikiSearchResponse>(url);
+
     return data.query.search.map((match) => match.title);
-  };
+  }
 
-  const getCategoriesFromPage = async (
-    pageId: number,
-  ): Promise<{ ns: number; title: string }[]> => {
-    const url = buildApiUrl({
-      action: 'query',
-      pageids: pageId.toString(),
-      prop: 'categories',
-      cllimit: 'max',
-    });
+  async function getCategoriesFromPage(pageId: number): Promise<WikiPageCategory[]> {
+    const result = await getCategoriesForPages(pageId);
+    return result[pageId]?.categories ?? [];
+  }
 
-    const data = await getCachedOrFetch<{
-      batchcomplete: string;
-      query: {
-        pages: Record<
-          string,
-          {
-            pageid: number;
-            ns: number;
-            title: string;
-            categories: { ns: number; title: string }[];
+  async function getCategoriesForPages(
+    ...pageIds: number[]
+  ): Promise<Record<string, { categories: WikiPageCategory[] }>> {
+    const titleChunks = chunkArray(pageIds, 50);
+    const totalPages: Record<string, { categories: WikiPageCategory[] }> = {};
+
+    await Promise.all(
+      titleChunks.map(async (chunk) => {
+        const baseParams = {
+          action: 'query',
+          pageids: chunk.join('|'),
+          prop: 'categories',
+          cllimit: 'max', // 500 max per request across all pages — paginate via clcontinue
+        };
+
+        let data = await getCachedOrFetch<CategoriesResponse>(buildApiUrl(baseParams));
+
+        const collect = (resp: CategoriesResponse) => {
+          for (const [id, page] of Object.entries(resp.query.pages)) {
+            const existing = totalPages[id]?.categories ?? [];
+            totalPages[id] = { categories: existing.concat(page.categories ?? []) };
           }
-        >;
-      };
-      limits: { categories: number };
-    }>(url);
+        };
 
-    return Object.values(data.query.pages)
-      .map((p) => p.categories)
-      .flat();
-  };
+        collect(data);
 
-  const getFileUrls = async (fileNames: string[]): Promise<Map<string, string>> => {
+        while (data.continue !== undefined) {
+          data = await getCachedOrFetch<CategoriesResponse>(
+            buildApiUrl({
+              ...baseParams,
+              clcontinue: data.continue.clcontinue,
+              continue: data.continue.continue,
+            }),
+          );
+          collect(data);
+        }
+      }),
+    );
+
+    return totalPages;
+  }
+
+  async function getFileUrls(fileNames: string[]): Promise<Map<string, string>> {
     if (!fileNames.length) return new Map();
 
     const titles = fileNames.map((f) => `File:${f}`).join('|');
@@ -758,7 +829,7 @@ export function wiki(
     }
 
     return result;
-  };
+  }
 
   const base: Wiki = {
     getPage,
@@ -776,5 +847,6 @@ export function wiki(
   if (pluginName) {
     return { ...base, ...PLUGINS[pluginName].factory(base) };
   }
+
   return base;
 }

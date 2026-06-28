@@ -177,14 +177,21 @@ export interface WikiParsePropertiesPanelType {
 }
 
 export interface WikiSearchGeneratorResponse {
-  continue: {
+  continue?: {
     clcontinue: string;
     continue: string;
   };
   query: {
     pages: Record<string, WikiSearchGeneratorPageItem>;
   };
-  limit: Record<string, string>;
+  limits: {
+    categories: number;
+  };
+}
+
+export interface WikiPageCategory {
+  ns: number;
+  title: string;
 }
 
 export interface WikiSearchGeneratorPageItem {
@@ -204,6 +211,40 @@ export interface WikiImageInfoResponse {
       {
         title: string;
         imageinfo?: Array<{ url: string }>;
+      }
+    >;
+  };
+}
+
+/** @internal */
+export interface WikiGetPageResponse {
+  batchcomplete: string;
+  continue?: { gsroffset: number; continue: string };
+  warnings?: { query: { '*': string } };
+  query: {
+    pages: Record<
+      string,
+      {
+        pageid: number;
+        ns: number;
+        title: string;
+        index: number;
+        contentmodel: string;
+        pagelanguage: string;
+        pagelanguagehtmlcode: string;
+        pagelanguagedir: string;
+        touched: string;
+        lastrevid: number;
+        length: number;
+        fullurl: string;
+        editurl: string;
+        canonicalurl: string;
+        thumbnail: {
+          source: string;
+          width: number;
+          height: number;
+        };
+        categories?: Array<{ ns: number; title: string }>;
       }
     >;
   };
@@ -436,6 +477,10 @@ export interface WikiPageFlags {
    * Width of image elements in pixels. Default is `original`.
    */
   thumbnailSize?: number;
+  /**
+   * Limit the number of results returned. Default is `20`.
+   */
+  limit?: number;
 }
 
 export interface WikiContentOptions {
@@ -444,10 +489,10 @@ export interface WikiContentOptions {
 
 export interface Wiki {
   getPage: (query: string, flags?: WikiPageFlags) => Promise<WikiPage[]>;
-  getPageById: (
-    pageId: number,
-    flags?: Omit<WikiPageFlags, 'category'>,
-  ) => Promise<WikiPage | null>;
+  getPageById: {
+    (pageId: number, flags?: Omit<WikiPageFlags, 'category'>): Promise<WikiPage | null>;
+    (pageId: number[], flags?: Omit<WikiPageFlags, 'category'>): Promise<WikiPage[]>;
+  };
   getPageByTitle: (title: string, flags?: WikiPageFlags) => Promise<WikiPage | null>;
   getPagesByCategory: (
     category: string,
@@ -463,19 +508,46 @@ export interface Wiki {
     ): Promise<Record<string, string>>;
     (pageId: number, contentOptions?: WikiContentOptions): Promise<string | undefined>;
   };
-  getCategoryMembers: (categoryTitle: string) => Promise<
-    Array<{
-      pageid: number;
-      ns: number;
-      title: string;
-    }>
-  >;
+  getCategoryMembers: {
+    (
+      categoryTitle: string,
+      flags?: Pick<WikiPageFlags, 'limit'>,
+    ): Promise<WikiCategoryMemberItem[]>;
+    (
+      categoryTitle: string[],
+      flags?: Pick<WikiPageFlags, 'limit'>,
+    ): Promise<WikiCategoryMemberItem[]>;
+  };
   searchCategories: (query: string) => Promise<string[]>;
-  getCategoriesFromPage: (pageId: number) => Promise<
-    {
-      ns: number;
-      title: string;
-    }[]
-  >;
+  getCategoriesFromPage: (pageId: number) => Promise<WikiPageCategory[]>;
   clearCache: () => void;
 }
+
+/** @internal */
+export type CategoriesResponse = {
+  continue?: { clcontinue: string; continue: string };
+  query: {
+    pages: Record<
+      string,
+      {
+        pageid: number;
+        ns: number;
+        title: string;
+        categories?: WikiPageCategory[];
+      }
+    >;
+  };
+};
+
+export interface WikiCategoryMemberItem {
+  pageid: number;
+  ns: number;
+  title: string;
+}
+
+/** @internal */
+export type CategoryMembersResponse = {
+  batchcomplete: string;
+  continue?: { cmcontinue: string; continue: string };
+  query: { categorymembers: Array<{ pageid: number; ns: number; title: string }> };
+};

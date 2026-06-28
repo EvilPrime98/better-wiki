@@ -1,4 +1,4 @@
-import { WikiSearchGeneratorPageItem } from './types';
+import type { WikiSearchGeneratorPageItem } from './types';
 
 export function isGeneratorPageItem(candidate: unknown): candidate is WikiSearchGeneratorPageItem {
   return (

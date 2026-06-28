@@ -139,6 +139,7 @@ export interface WikiCharacter {
 
 export interface WikiFandomFlags {
   thumbnailSize?: number;
+  /** Only meaningful for `getComic` / `getVolume` (search-based). For `getComicById` / `getVolumeById`, pass an array of IDs instead. */
   multiple?: boolean;
   includeCollections?: boolean;
   categoriesIn?: string[];
@@ -560,21 +561,34 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiComicBuilder(best?.page, best?.content ?? ({} as WikiStrContent));
   }
 
-  const getComicById = async (
+  async function getComicById(
     pageId: number,
-    flags: WikiFandomFlags = {},
-  ): Promise<WikiComic | null> => {
-    const page = await wikiClient.getPageById(
-      pageId,
-      flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {},
-    );
+    flags?: Omit<WikiFandomFlags, 'multiple'>,
+  ): Promise<WikiComic | null>;
+  async function getComicById(
+    pageId: number[],
+    flags?: Omit<WikiFandomFlags, 'multiple'>,
+  ): Promise<WikiComic[]>;
+  async function getComicById(
+    pageId: number | number[],
+    flags: Omit<WikiFandomFlags, 'multiple'> = {},
+  ): Promise<WikiComic | null | WikiComic[]> {
+    const thumbFlags = flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {};
 
+    const toComic = async (page: WikiPage): Promise<WikiComic> => {
+      return wikiComicBuilder(page, (await page.getStructuredContent()) as WikiStrContent);
+    };
+
+    if (Array.isArray(pageId)) {
+      const pages = await wikiClient.getPageById(pageId, thumbFlags);
+      return Promise.all(pages.map(toComic));
+    }
+
+    const page = await wikiClient.getPageById(pageId, thumbFlags);
     if (!page) return null;
 
-    const pageStrContent = (await page.getStructuredContent()) as WikiStrContent;
-
-    return wikiComicBuilder(page, pageStrContent);
-  };
+    return toComic(page);
+  }
 
   async function getVolume(
     query: string,
@@ -615,21 +629,29 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiVolumeBuilder(best.page, best.content);
   }
 
-  const getVolumeById = async (
-    pageId: number,
+  async function getVolumeById(pageId: number, thumbnailSize?: number): Promise<WikiVolume | null>;
+  async function getVolumeById(pageId: number[], thumbnailSize?: number): Promise<WikiVolume[]>;
+  async function getVolumeById(
+    pageId: number | number[],
     thumbnailSize?: number,
-  ): Promise<WikiVolume | null> => {
-    const page = await wikiClient.getPageById(
-      pageId,
-      thumbnailSize !== undefined ? { thumbnailSize } : {},
-    );
+  ): Promise<WikiVolume | null | WikiVolume[]> {
+    const thumbNailSize = thumbnailSize !== undefined ? { thumbnailSize } : {};
 
+    const toVolume = async (page: WikiPage): Promise<WikiVolume> => {
+      const pageStrContent = (await page.getStructuredContent()) as WikiStrContent;
+      return wikiVolumeBuilder(page, pageStrContent);
+    };
+
+    if (Array.isArray(pageId)) {
+      const pages = await wikiClient.getPageById(pageId, thumbNailSize);
+      return Promise.all(pages.map(toVolume));
+    }
+
+    const page = await wikiClient.getPageById(pageId, thumbNailSize);
     if (!page) return null;
 
-    const content = (await page.getStructuredContent()) as WikiStrContent;
-
-    return wikiVolumeBuilder(page, content);
-  };
+    return toVolume(page);
+  }
 
   async function getCharacter(
     query: string,
