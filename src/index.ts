@@ -10,4 +10,7 @@ export type {
   WikiComic,
   WikiReleaseDate,
   WikiVolume,
+  WikiCharacterHistorySection,
+  WikiCharacter,
+  WikiFandomFlags,
 } from './plugins/dc-fandom';
