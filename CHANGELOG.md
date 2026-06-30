@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.9.1
+
+### Patch Changes
+
+- 2abb6f9: Export all public dc-fandom plugin types from the package entry point: `WikiCharacter`, `WikiCharacterHistorySection`, and `WikiFandomFlags` are now importable directly from `'better-wiki'`.
+
 ## 0.9.0
 
 ### Minor Changes
