@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.9.0
+
+### Minor Changes
+
+- 47513ff: Add array overloads to `getPageById`, `getComicById`, `getVolumeById`, and `getCategoryMembers`; add `limit` flag to `getPage` and `getCategoryMembers`; `getCategoryMembers(string[])` now returns the intersection (members of the first category that belong to all remaining ones).
+
 ## 0.8.0
 
 ### Minor Changes
