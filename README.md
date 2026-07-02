@@ -85,8 +85,8 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 | `getPagesByCategory(category, flags?)`         | `WikiPage[]`                                              |
 | `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext                      |
 | `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox                 |
-| `getCategoryMembers(categoryTitle, flags?)`    | `WikiCategoryMemberItem[]`                                |
-| `getCategoryMembers(titles[], flags?)`         | `WikiCategoryMemberItem[]` — intersection across titles   |
+| `getCategoryMembers(categoryTitle)`            | `WikiCategoryMemberItem[]`                                |
+| `getCategoryMembers(titles[])`                 | `WikiCategoryMemberItem[]` — intersection across titles   |
 | `searchCategories(query)`                      | `string[]`                                                |
 | `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                                    |
 | `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px |
@@ -173,8 +173,8 @@ Targets `https://dc.fandom.com`. Adds:
 | `getComicById(pageIds[], flags?)`            | `WikiComic[]`           | Batch comic lookup by IDs                    |
 | `getVolume(query, flags?)`                   | `WikiVolume \| null`    | Best-match volume by search query            |
 | `getVolume(query, { multiple: true })`       | `WikiVolume[]`          | All matching volumes                         |
-| `getVolumeById(pageId, thumbnailSize?)`      | `WikiVolume \| null`    | Volume by MediaWiki page ID                  |
-| `getVolumeById(pageIds[], thumbnailSize?)`   | `WikiVolume[]`          | Batch volume lookup by IDs                   |
+| `getVolumeById(pageId, flags?)`              | `WikiVolume \| null`    | Volume by MediaWiki page ID                  |
+| `getVolumeById(pageIds[], flags?)`           | `WikiVolume[]`          | Batch volume lookup by IDs                   |
 | `getCharacter(query, flags?)`                | `WikiCharacter \| null` | Best-match character by search query         |
 | `getCharacter(query, { multiple: true })`    | `WikiCharacter[]`       | All matching characters                      |
 | `getCharacterById(pageId, flags?)`           | `WikiCharacter \| null` | Character by MediaWiki page ID               |
@@ -188,7 +188,7 @@ A `WikiCharacter` carries bio fields (`realName`, `aliases`, `alignment`, …), 
 | -------------------- | ---------- | -------------------------------------------------------------------------------------- |
 | `thumbnailSize`      | `number`   | Scale cover thumbnail URLs to this width (px).                                         |
 | `includeCollections` | `boolean`  | Also match pages in `Category:Collected Editions` (default: comics only).              |
-| `categoriesIn`       | `string[]` | AND-filter: result must belong to **all** listed categories in addition to the OR set. |
+| `category`           | `string[]` | AND-filter: result must belong to **all** listed categories in addition to the OR set. |
 | `sorted`             | `boolean`  | With `multiple: true`, return comics ordered by release date (oldest first).           |
 
 Pass `flags.thumbnailSize` (number, px) to scale cover thumbnail URLs.
