@@ -1,12 +1,14 @@
 import type { Wiki, WikiPage, WikiFlags } from '../types';
 import Fuse from 'fuse.js';
 
+/** A single character/entity reference within a {@link WikiAppearingSection}. */ 
 export interface WikiAppearanceEntry {
   name: string;
   pageTitle: string;
   statusNote?: string;
 }
 
+/** Characters, locations, items, and concepts appearing in a comic, grouped by role. */ 
 export interface WikiAppearingSection {
   featuredCharacters: WikiAppearanceEntry[];
   supportingCharacters: WikiAppearanceEntry[];
@@ -17,8 +19,10 @@ export interface WikiAppearingSection {
   concepts: WikiAppearanceEntry[];
 }
 
+/** Flat key/value map parsed from a page's infobox template. */ 
 export type WikiStrContent = Record<string, string>;
 
+/** An alternate cover for a comic issue, with its own artist credits. */ 
 export interface WikiComicCoverVariant {
   coverNumber: number;
   artists: string[];
@@ -26,6 +30,7 @@ export interface WikiComicCoverVariant {
   imageLabel?: string;
 }
 
+/** Creative credits for a comic issue, grouped by role. */ 
 export interface WikiCredits {
   writers: string[];
   artists: string[];
@@ -36,6 +41,7 @@ export interface WikiCredits {
   executiveEditors: string[];
 }
 
+/** A single comic-book issue, as returned by {@link dcFandomPlugin}'s `getComic`/`getComicById`. */ 
 export interface WikiComic {
   title: string;
   volume: string;
@@ -55,12 +61,14 @@ export interface WikiComic {
   trivia: string[];
 }
 
+/** A comic's release date, as separate day/month/year strings from the infobox. */ 
 export interface WikiReleaseDate {
   releaseDay: string;
   releaseMonth: string;
   releaseYear: string;
 }
 
+/** A comic-book volume/series, as returned by {@link dcFandomPlugin}'s `getVolume`/`getVolumeById`. */ 
 export interface WikiVolume {
   title: string;
   thumbnail: string;
@@ -93,11 +101,13 @@ export interface WikiVolume {
   issueList: string[];
 }
 
+/** A single heading/text block from a character's "History" section. */ 
 export interface WikiCharacterHistorySection {
   heading: string;
   text: string;
 }
 
+/** A character, as returned by {@link dcFandomPlugin}'s `getCharacter`/`getCharacterById`. */ 
 export interface WikiCharacter {
   name: string;
   image: string;
@@ -134,6 +144,7 @@ export interface WikiCharacter {
   weapons: string[];
   notes: string[];
   trivia: string[];
+  /** Fetches the comics this character appears in, via its `Category:.../Appearances` category. */ 
   getAppearances(flags?: Pick<WikiFlags, 'sorted'>): Promise<WikiComic[]>;
 }
 
@@ -145,6 +156,14 @@ const byReleaseDate = (a: WikiComic, b: WikiComic): number => {
   return Number(a.releaseDate.releaseDay) - Number(b.releaseDate.releaseDay);
 };
 
+/**
+ * Extends a base {@link Wiki} client with DC Fandom-specific lookups for comics,
+ * volumes, and characters, built on top of the base client's generic page search.
+ *
+ * @param wikiClient - The base client to build on, typically for `https://dc.fandom.com`.
+ * @returns An object with `getComic`, `getComicById`, `getVolume`, `getVolumeById`,
+ *   `getCharacter`, `getCharacterById`, and `getCharacterAppearances`.
+ */ 
 export function dcFandomPlugin(wikiClient: Wiki) {
   const APPEARING_SECTIONS: Record<string, keyof WikiAppearingSection> = {
     'featured characters': 'featuredCharacters',
@@ -504,6 +523,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   //PUBLIC INTERFACE
 
+  /**
+   * Finds the best-matching comic issue for `query`, fuzzy-matched against page titles.
+   *
+   * @param query - Comic title to search for, e.g. `"Action Comics #1000 (2018)"`.
+   * @param flags - Search flags plus `multiple` to return all candidates instead of the best match.
+   * @returns The best match (or `null`), or all candidates when `flags.multiple` is `true`.
+   */ 
   async function getComic(
     query: string,
     flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
@@ -559,6 +585,12 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiComicBuilder(best?.page, best?.content ?? ({} as WikiStrContent));
   }
 
+  /**
+   * Fetches one or more comic issues by their MediaWiki page ID.
+   *
+   * @param pageId - A single page ID, or an array to fetch several at once.
+   * @param flags - Only `thumbnailSize` is used.
+   */ 
   async function getComicById(
     pageId: number,
     flags?: Pick<WikiFlags, 'thumbnailSize'>,
@@ -588,6 +620,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return toComic(page);
   }
 
+  /**
+   * Finds the best-matching comic-book volume for `query`, fuzzy-matched against page titles.
+   *
+   * @param query - Volume title to search for.
+   * @param flags - Search flags plus `multiple` to return all candidates instead of the best match.
+   * @returns The best match (or `null`), or all candidates when `flags.multiple` is `true`.
+   */ 
   async function getVolume(
     query: string,
     flags?: Pick<WikiFlags, 'thumbnailSize'> & { multiple?: false },
@@ -627,6 +666,12 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiVolumeBuilder(best.page, best.content);
   }
 
+  /**
+   * Fetches one or more comic-book volumes by their MediaWiki page ID.
+   *
+   * @param pageId - A single page ID, or an array to fetch several at once.
+   * @param flags - Only `thumbnailSize` is used.
+   */ 
   async function getVolumeById(
     pageId: number,
     flags?: Pick<WikiFlags, 'thumbnailSize'>,
@@ -657,6 +702,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return toVolume(page);
   }
 
+  /**
+   * Finds the best-matching character for `query`, fuzzy-matched against page titles.
+   *
+   * @param query - Character name to search for.
+   * @param flags - Search flags plus `multiple` to return all candidates instead of the best match.
+   * @returns The best match (or `null`), or all candidates when `flags.multiple` is `true`.
+   */ 
   async function getCharacter(
     query: string,
     flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple?: false },
@@ -695,6 +747,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiCharacterBuilder(best.page, best.content);
   }
 
+  /**
+   * Fetches a character by its MediaWiki page ID.
+   *
+   * @param pageId - The character page's ID.
+   * @param flags - Only `thumbnailSize` is used.
+   * @returns The character, or `null` if the page doesn't exist.
+   */ 
   const getCharacterById = async (
     pageId: number,
     flags: Pick<WikiFlags, 'thumbnailSize'> = {},
@@ -708,6 +767,12 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiCharacterBuilder(page, content);
   };
 
+  /**
+   * Fetches every comic a character appears in, via the wiki's `Category:<title>/Appearances` category.
+   *
+   * @param characterTitle - Exact page title of the character.
+   * @param flags - Only `sorted` is used, to sort results by release date.
+   */ 
   const getCharacterAppearances = async (
     characterTitle: string,
     flags: Pick<WikiFlags, 'sorted'> = {},
