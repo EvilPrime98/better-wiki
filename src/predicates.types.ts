@@ -6,7 +6,7 @@ import type { WikiSearchGeneratorPageItem } from './types';
  *
  * @param candidate - The value to check, typically an entry from a `query.pages` map.
  * @returns `true` if `candidate` is a {@link WikiSearchGeneratorPageItem}.
- */ 
+ */
 export function isGeneratorPageItem(candidate: unknown): candidate is WikiSearchGeneratorPageItem {
   return (
     typeof candidate === 'object' &&

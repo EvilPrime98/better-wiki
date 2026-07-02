@@ -382,25 +382,25 @@ export interface WikiInfobox {
   [x: string]: string;
 }
 
-/** A wiki page as returned by the base client, with lazily-fetched content accessors. */ 
+/** A wiki page as returned by the base client, with lazily-fetched content accessors. */
 export interface WikiPage {
-  /** MediaWiki page ID. */ 
+  /** MediaWiki page ID. */
   id: number;
   title: string;
   canonicalUrl: string;
   thumbnail: string;
   categories: string[];
-  /** Fetches and parses the page's infobox template into a flat key/value map. */ 
+  /** Fetches and parses the page's infobox template into a flat key/value map. */
   getStructuredContent: () => Promise<Record<string, string>>;
-  /** Fetches the page's raw wikitext content. */ 
+  /** Fetches the page's raw wikitext content. */
   getPageContent: () => Promise<string | undefined>;
-  /** Fetches infobox data via the MediaWiki `parse` API's structured properties. */ 
+  /** Fetches infobox data via the MediaWiki `parse` API's structured properties. */
   getInfobox: () => Promise<{
     [k: string]: string;
   }>;
-  /** Fetches URLs of images embedded in the page, optionally scaled to `width`. */ 
+  /** Fetches URLs of images embedded in the page, optionally scaled to `width`. */
   getImages: (width?: number) => Promise<(string | undefined)[]>;
-  /** Fetches URLs of images in the page's `/Gallery` subpage, optionally scaled to `width`. */ 
+  /** Fetches URLs of images in the page's `/Gallery` subpage, optionally scaled to `width`. */
   getGallery: (width?: number) => Promise<string[]>;
 }
 
@@ -503,37 +503,37 @@ export interface WikiFlags {
   sorted?: boolean;
 }
 
-/** Options controlling how {@link Wiki.getPageContent} returns page content. */ 
+/** Options controlling how {@link Wiki.getPageContent} returns page content. */
 export interface WikiContentOptions {
-  /** When `true`, parse the page's infobox template into a key/value map instead of returning raw wikitext. */ 
+  /** When `true`, parse the page's infobox template into a key/value map instead of returning raw wikitext. */
   structured?: boolean;
 }
 
-/** Base client returned by {@link wiki}, providing generic MediaWiki page/category lookups. */ 
+/** Base client returned by {@link wiki}, providing generic MediaWiki page/category lookups. */
 export interface Wiki {
-  /** Searches for pages matching `query`, optionally filtered by category. */ 
+  /** Searches for pages matching `query`, optionally filtered by category. */
   getPage: (
     query: string,
     flags?: Pick<WikiFlags, 'category' | 'categoriesOr' | 'thumbnailSize' | 'limit'>,
   ) => Promise<WikiPage[]>;
-  /** Fetches one or more pages by their MediaWiki page ID. */ 
+  /** Fetches one or more pages by their MediaWiki page ID. */
   getPageById: {
     (pageId: number, flags?: Pick<WikiFlags, 'thumbnailSize'>): Promise<WikiPage | null>;
     (pageId: number[], flags?: Pick<WikiFlags, 'thumbnailSize'>): Promise<WikiPage[]>;
   };
-  /** Fetches a single page by its exact title, or `null` if not found. */ 
+  /** Fetches a single page by its exact title, or `null` if not found. */
   getPageByTitle: (
     title: string,
     flags?: Pick<WikiFlags, 'category' | 'thumbnailSize'>,
   ) => Promise<WikiPage | null>;
-  /** Fetches every page belonging to `category`. */ 
+  /** Fetches every page belonging to `category`. */
   getPagesByCategory: (
     category: string,
     flags?: Pick<WikiFlags, 'thumbnailSize'>,
   ) => Promise<WikiPage[]>;
-  /** Fetches a page's thumbnail URL, optionally scaled to `width`. */ 
+  /** Fetches a page's thumbnail URL, optionally scaled to `width`. */
   getThumbnailById: (pageId: number, width?: number) => Promise<string>;
-  /** Fetches a page's content by ID, as raw wikitext or a structured key/value map. */ 
+  /** Fetches a page's content by ID, as raw wikitext or a structured key/value map. */
   getPageContent: {
     (
       pageId: number,
@@ -543,16 +543,16 @@ export interface Wiki {
     ): Promise<Record<string, string>>;
     (pageId: number, contentOptions?: WikiContentOptions): Promise<string | undefined>;
   };
-  /** Fetches the members of one or more categories, paginating through all results. */ 
+  /** Fetches the members of one or more categories, paginating through all results. */
   getCategoryMembers: {
     (categoryTitle: string): Promise<WikiCategoryMemberItem[]>;
     (categoryTitle: string[]): Promise<WikiCategoryMemberItem[]>;
   };
-  /** Searches category titles (MediaWiki namespace 14) matching `query`. */ 
+  /** Searches category titles (MediaWiki namespace 14) matching `query`. */
   searchCategories: (query: string) => Promise<string[]>;
-  /** Fetches the categories a single page belongs to. */ 
+  /** Fetches the categories a single page belongs to. */
   getCategoriesFromPage: (pageId: number) => Promise<WikiPageCategory[]>;
-  /** Clears the in-memory API response cache. */ 
+  /** Clears the in-memory API response cache. */
   clearCache: () => void;
 }
 

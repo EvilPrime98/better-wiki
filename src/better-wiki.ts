@@ -77,7 +77,7 @@ const DEFAULT_OPTIONS: Required<WikiOptions> = {
  *
  * @param options - Client options plus the `plugin` to load.
  * @throws If `options.plugin` isn't a registered plugin name.
- */ 
+ */
 export function wiki<K extends PluginName>(
   options: WikiOptions & { plugin: K },
 ): Wiki & PluginReturn<K>;
@@ -86,7 +86,7 @@ export function wiki<K extends PluginName>(
  *
  * @param url - Base URL of the wiki (without `/wiki` or `/api.php`).
  * @param options - Client options such as caching, timeouts, and retries.
- */ 
+ */
 export function wiki(url: string, options?: WikiOptions): Wiki;
 export function wiki(
   urlOrOptions: string | (WikiOptions & { plugin?: PluginName }),
