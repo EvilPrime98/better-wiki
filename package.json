@@ -1,6 +1,6 @@
 {
   "name": "better-wiki",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "A typed, cache-aware client for MediaWiki/Fandom wikis, with helpers for comics, series and characters.",
   "type": "module",
   "exports": {
