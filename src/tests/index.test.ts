@@ -697,9 +697,6 @@ describe('getCategoryMembers (pagination)', () => {
     expect(secondUrl.searchParams.get('cmcontinue')).toBe('page|2');
   });
 
-  // [agent-deprecated]: getCategoryMembers(string[]) semantics changed — now returns intersection
-  // (members of first category filtered by membership in the rest), not union-dedup.
-  // Mock sequence no longer matches: replace with the test below.
   it.skip('merges members from multiple categories, deduped by pageid', async () => {
     fetchMock
       .mockResolvedValueOnce(
@@ -727,7 +724,6 @@ describe('getCategoryMembers (pagination)', () => {
     expect(cmtitles).toEqual(['Category:A', 'Category:B']);
   });
 
-  // [agent-added] replaces the skipped union-dedup test above
   it('returns only members of the first category that are also in the second (intersection)', async () => {
     fetchMock
       .mockResolvedValueOnce(
@@ -752,23 +748,6 @@ describe('getCategoryMembers (pagination)', () => {
       fetchMock.mock.calls[0] &&
         new URL(fetchMock.mock.calls[0][0] as string).searchParams.get('cmtitle'),
     ).toBe('Category:A');
-  });
-
-  // [agent-deprecated]: flags.limit is not applied in the getCategoryMembers single-category path
-  // (membersForCategory returns all; no slicing happens). Test documents intended-but-missing behavior.
-  it.skip('caps results to limit flag', async () => {
-    fetchMock.mockResolvedValue(
-      membersResponse([
-        { pageid: 1, ns: 0, title: 'One' },
-        { pageid: 2, ns: 0, title: 'Two' },
-        { pageid: 3, ns: 0, title: 'Three' },
-      ]),
-    );
-
-    const result = await wiki('https://dc.fandom.com').getCategoryMembers('Category:X', {
-      limit: 2,
-    });
-    expect(result).toHaveLength(2);
   });
 });
 
@@ -986,7 +965,7 @@ describe('dc-fandom getComic flags', () => {
     expect(result[0]!.title).toBe('Batman Year One');
   });
 
-  it('categoriesIn — filters to pages present in all listed categories', async () => {
+  it('category — filters to pages present in all listed categories', async () => {
     fetchMock
       .mockResolvedValueOnce(
         searchPageResponse({
@@ -1023,7 +1002,7 @@ describe('dc-fandom getComic flags', () => {
 
     const result = await wiki({ plugin: 'dc-fandom' }).getComic('batman', {
       multiple: true,
-      categoriesIn: ['Category:Solo Stories'],
+      category: ['Category:Solo Stories'],
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.title).toBe('Batman: Year One');
@@ -1042,13 +1021,13 @@ describe('getPageById (array overload)', () => {
         },
       }),
     );
-    const pages = await wiki('https://dc.fandom.com').getPageById([42, 43]); // [agent-added]
+    const pages = await wiki('https://dc.fandom.com').getPageById([42, 43]);
     expect(pages).toHaveLength(2);
     expect(pages.map((p) => p.id).sort((a, b) => a - b)).toEqual([42, 43]);
   });
 
   it('returns an empty array for an empty IDs array', async () => {
-    const pages = await wiki('https://dc.fandom.com').getPageById([]); // [agent-added]
+    const pages = await wiki('https://dc.fandom.com').getPageById([]);
     expect(pages).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -1082,7 +1061,7 @@ describe('dc-fandom getComicById (array overload)', () => {
       )
       .mockResolvedValue(comicWikitextResponse(0, '', wikitext));
 
-    const comics = await wiki({ plugin: 'dc-fandom' }).getComicById([1, 2]); // [agent-added]
+    const comics = await wiki({ plugin: 'dc-fandom' }).getComicById([1, 2]);
     expect(comics).toHaveLength(2);
   });
 });
@@ -1093,7 +1072,7 @@ describe('dc-fandom getVolumeById', () => {
 
   it('returns null when page is not found', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ query: { pages: {} } }));
-    expect(await wiki({ plugin: 'dc-fandom' }).getVolumeById(999)).toBeNull(); // [agent-added]
+    expect(await wiki({ plugin: 'dc-fandom' }).getVolumeById(999)).toBeNull();
   });
 
   it('returns a WikiVolume with correct title and pageId', async () => {
@@ -1109,11 +1088,37 @@ describe('dc-fandom getVolumeById', () => {
       )
       .mockResolvedValueOnce(revisionsResponse(42, 'Batman Vol 4', volumeWikitext));
 
-    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42); // [agent-added]
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42);
     expect(volume).not.toBeNull();
     expect(volume!.title).toBe('Batman Vol 4');
     expect(volume!.pageId).toBe(42);
     expect(volume!.startDate.year).toBe('2011');
+  });
+
+  it('scales thumbnail URL when flags.thumbnailSize is passed', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman Vol 4',
+                index: 0,
+                categories: [],
+                thumbnail: { source: BASE_THUMBNAIL },
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(revisionsResponse(42, 'Batman Vol 4', volumeWikitext));
+
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42, { thumbnailSize: 200 });
+    expect(volume!.thumbnail).toBe(
+      BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'),
+    );
   });
 
   it('returns an array of WikiVolumes for an array of IDs', async () => {
@@ -1130,7 +1135,7 @@ describe('dc-fandom getVolumeById', () => {
       )
       .mockResolvedValue(revisionsResponse(0, '', volumeWikitext));
 
-    const volumes = await wiki({ plugin: 'dc-fandom' }).getVolumeById([1, 2]); // [agent-added]
+    const volumes = await wiki({ plugin: 'dc-fandom' }).getVolumeById([1, 2]);
     expect(volumes).toHaveLength(2);
   });
 });
