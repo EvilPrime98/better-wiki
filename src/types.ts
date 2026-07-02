@@ -464,7 +464,7 @@ export interface ComicExtras {
   coverVariants: CoverVariant[];
 }
 
-export interface WikiPageFlags {
+export interface WikiFlags {
   /**
    * Result must be a member of `all` of these categories.
    */
@@ -481,6 +481,19 @@ export interface WikiPageFlags {
    * Limit the number of results returned. Default is `20`.
    */
   limit?: number;
+  /**
+   * Return all matches instead of just the best match. Default is `false`.
+   */
+  multiple?: boolean;
+  /**
+   * Only meaningful for search-based lookups (e.g. `getComic`). Also match pages in
+   * `Category:Collected Editions`.
+   */
+  includeCollections?: boolean;
+  /**
+   * Sort results by release date. Default is `false`.
+   */
+  sorted?: boolean;
 }
 
 export interface WikiContentOptions {
@@ -488,15 +501,21 @@ export interface WikiContentOptions {
 }
 
 export interface Wiki {
-  getPage: (query: string, flags?: WikiPageFlags) => Promise<WikiPage[]>;
+  getPage: (
+    query: string,
+    flags?: Pick<WikiFlags, 'category' | 'categoriesOr' | 'thumbnailSize' | 'limit'>,
+  ) => Promise<WikiPage[]>;
   getPageById: {
-    (pageId: number, flags?: Omit<WikiPageFlags, 'category'>): Promise<WikiPage | null>;
-    (pageId: number[], flags?: Omit<WikiPageFlags, 'category'>): Promise<WikiPage[]>;
+    (pageId: number, flags?: Pick<WikiFlags, 'thumbnailSize'>): Promise<WikiPage | null>;
+    (pageId: number[], flags?: Pick<WikiFlags, 'thumbnailSize'>): Promise<WikiPage[]>;
   };
-  getPageByTitle: (title: string, flags?: WikiPageFlags) => Promise<WikiPage | null>;
+  getPageByTitle: (
+    title: string,
+    flags?: Pick<WikiFlags, 'category' | 'thumbnailSize'>,
+  ) => Promise<WikiPage | null>;
   getPagesByCategory: (
     category: string,
-    flags?: Omit<WikiPageFlags, 'category'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'>,
   ) => Promise<WikiPage[]>;
   getThumbnailById: (pageId: number, width?: number) => Promise<string>;
   getPageContent: {
@@ -509,14 +528,8 @@ export interface Wiki {
     (pageId: number, contentOptions?: WikiContentOptions): Promise<string | undefined>;
   };
   getCategoryMembers: {
-    (
-      categoryTitle: string,
-      flags?: Pick<WikiPageFlags, 'limit'>,
-    ): Promise<WikiCategoryMemberItem[]>;
-    (
-      categoryTitle: string[],
-      flags?: Pick<WikiPageFlags, 'limit'>,
-    ): Promise<WikiCategoryMemberItem[]>;
+    (categoryTitle: string): Promise<WikiCategoryMemberItem[]>;
+    (categoryTitle: string[]): Promise<WikiCategoryMemberItem[]>;
   };
   searchCategories: (query: string) => Promise<string[]>;
   getCategoriesFromPage: (pageId: number) => Promise<WikiPageCategory[]>;

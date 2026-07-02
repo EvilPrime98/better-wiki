@@ -12,5 +12,4 @@ export type {
   WikiVolume,
   WikiCharacterHistorySection,
   WikiCharacter,
-  WikiFandomFlags,
 } from './plugins/dc-fandom';

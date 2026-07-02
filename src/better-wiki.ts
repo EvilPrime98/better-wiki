@@ -30,7 +30,7 @@ import type {
   WikiParsePropertiesDataType,
   WikiParsePropertiesImageType,
   WikiParsePropertiesGroupType,
-  WikiPageFlags,
+  WikiFlags,
   WikiContentOptions,
   Wiki,
   WikiGetPageResponse,
@@ -449,7 +449,10 @@ export function wiki(
 
   //PUBLIC INTERFACE
 
-  async function getPage(query: string, flags: WikiPageFlags = {}): Promise<WikiPage[]> {
+  async function getPage(
+    query: string,
+    flags: Pick<WikiFlags, 'category' | 'categoriesOr' | 'thumbnailSize' | 'limit'> = {},
+  ): Promise<WikiPage[]> {
     const searchParams = {
       action: 'query',
       generator: 'search',
@@ -523,15 +526,15 @@ export function wiki(
 
   async function getPageById(
     pageId: number,
-    flags?: Omit<WikiPageFlags, 'category'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'>,
   ): Promise<WikiPage | null>;
   async function getPageById(
     pageId: number[],
-    flags?: Omit<WikiPageFlags, 'category'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'>,
   ): Promise<WikiPage[]>;
   async function getPageById(
     pageId: number | number[],
-    flags: Omit<WikiPageFlags, 'category'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
   ): Promise<WikiPage | null | WikiPage[]> {
     const ids = Array.isArray(pageId) ? pageId : [pageId];
 
@@ -587,7 +590,7 @@ export function wiki(
 
   async function getPageByTitle(
     title: string,
-    flags: WikiPageFlags = {},
+    flags: Pick<WikiFlags, 'category' | 'thumbnailSize'> = {},
   ): Promise<WikiPage | null> {
     const url = buildApiUrl({
       action: 'query',
@@ -654,7 +657,7 @@ export function wiki(
 
   async function getPagesByCategory(
     category: string,
-    flags: Omit<WikiPageFlags, 'category'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
   ): Promise<WikiPage[]> {
     const members = await getCategoryMembers(category);
     if (!members.length) return [];
@@ -703,17 +706,10 @@ export function wiki(
     );
   }
 
-  async function getCategoryMembers(
-    categoryTitle: string,
-    flags?: Pick<WikiPageFlags, 'limit'>,
-  ): Promise<WikiCategoryMemberItem[]>;
-  async function getCategoryMembers(
-    categoryTitle: string[],
-    flags?: Pick<WikiPageFlags, 'limit'>,
-  ): Promise<WikiCategoryMemberItem[]>;
+  async function getCategoryMembers(categoryTitle: string): Promise<WikiCategoryMemberItem[]>;
+  async function getCategoryMembers(categoryTitle: string[]): Promise<WikiCategoryMemberItem[]>;
   async function getCategoryMembers(
     categoryTitle: string | string[],
-    flags: Pick<WikiPageFlags, 'limit'> = {},
   ): Promise<WikiCategoryMemberItem[]> {
     const titles = Array.isArray(categoryTitle) ? categoryTitle : [categoryTitle];
 

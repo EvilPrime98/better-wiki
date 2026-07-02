@@ -1,4 +1,4 @@
-import type { Wiki, WikiPage } from '../types';
+import type { Wiki, WikiPage, WikiFlags } from '../types';
 import Fuse from 'fuse.js';
 
 export interface WikiAppearanceEntry {
@@ -134,16 +134,7 @@ export interface WikiCharacter {
   weapons: string[];
   notes: string[];
   trivia: string[];
-  getAppearances(flags?: Pick<WikiFandomFlags, 'sorted'>): Promise<WikiComic[]>;
-}
-
-export interface WikiFandomFlags {
-  thumbnailSize?: number;
-  /** Only meaningful for `getComic` / `getVolume` (search-based). For `getComicById` / `getVolumeById`, pass an array of IDs instead. */
-  multiple?: boolean;
-  includeCollections?: boolean;
-  categoriesIn?: string[];
-  sorted?: boolean;
+  getAppearances(flags?: Pick<WikiFlags, 'sorted'>): Promise<WikiComic[]>;
 }
 
 const byReleaseDate = (a: WikiComic, b: WikiComic): number => {
@@ -505,7 +496,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       weapons: parseBullets(content['Weapons']),
       notes: parseBullets(content['Notes']),
       trivia: parseBullets(content['Trivia']),
-      getAppearances(flags: Pick<WikiFandomFlags, 'sorted'> = {}): Promise<WikiComic[]> {
+      getAppearances(flags: Pick<WikiFlags, 'sorted'> = {}): Promise<WikiComic[]> {
         return getCharacterAppearances(page?.title ?? '', flags);
       },
     };
@@ -515,15 +506,22 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   async function getComic(
     query: string,
-    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: false },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+      multiple?: false;
+    },
   ): Promise<WikiComic | null>;
   async function getComic(
     query: string,
-    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: true; sorted?: boolean },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+      multiple: true;
+    },
   ): Promise<WikiComic[]>;
   async function getComic(
     query: string,
-    flags: WikiFandomFlags = {},
+    flags: Pick<
+      WikiFlags,
+      'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'multiple'
+    > = {},
   ): Promise<WikiComic[] | WikiComic | null> {
     const nQuery = preNormalization(query);
     const categoriesOr: string[] = ['Category:Comics'];
@@ -533,8 +531,8 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       categoriesOr.push('Category:Collected Editions');
     }
 
-    if (flags.categoriesIn && flags.categoriesIn.length > 0) {
-      categories.push(...flags.categoriesIn);
+    if (flags.category && flags.category.length > 0) {
+      categories.push(...flags.category);
     }
 
     const pages = await wikiClient.getPage(nQuery, {
@@ -563,15 +561,15 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   async function getComicById(
     pageId: number,
-    flags?: Omit<WikiFandomFlags, 'multiple'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'>,
   ): Promise<WikiComic | null>;
   async function getComicById(
     pageId: number[],
-    flags?: Omit<WikiFandomFlags, 'multiple'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'>,
   ): Promise<WikiComic[]>;
   async function getComicById(
     pageId: number | number[],
-    flags: Omit<WikiFandomFlags, 'multiple'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
   ): Promise<WikiComic | null | WikiComic[]> {
     const thumbFlags = flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {};
 
@@ -592,15 +590,15 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   async function getVolume(
     query: string,
-    flags?: { multiple?: false; thumbnailSize?: number },
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & { multiple?: false },
   ): Promise<WikiVolume | null>;
   async function getVolume(
     query: string,
-    flags: { multiple: true; thumbnailSize?: number },
+    flags: Pick<WikiFlags, 'thumbnailSize'> & { multiple: true },
   ): Promise<WikiVolume[]>;
   async function getVolume(
     query: string,
-    flags: WikiFandomFlags = {},
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'multiple'> = {},
   ): Promise<WikiVolume | null | WikiVolume[]> {
     const nQuery = preNormalization(query);
 
@@ -629,13 +627,19 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return wikiVolumeBuilder(best.page, best.content);
   }
 
-  async function getVolumeById(pageId: number, thumbnailSize?: number): Promise<WikiVolume | null>;
-  async function getVolumeById(pageId: number[], thumbnailSize?: number): Promise<WikiVolume[]>;
+  async function getVolumeById(
+    pageId: number,
+    flags?: Pick<WikiFlags, 'thumbnailSize'>,
+  ): Promise<WikiVolume | null>;
+  async function getVolumeById(
+    pageId: number[],
+    flags?: Pick<WikiFlags, 'thumbnailSize'>,
+  ): Promise<WikiVolume[]>;
   async function getVolumeById(
     pageId: number | number[],
-    thumbnailSize?: number,
+    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
   ): Promise<WikiVolume | null | WikiVolume[]> {
-    const thumbNailSize = thumbnailSize !== undefined ? { thumbnailSize } : {};
+    const thumbFlags = flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {};
 
     const toVolume = async (page: WikiPage): Promise<WikiVolume> => {
       const pageStrContent = (await page.getStructuredContent()) as WikiStrContent;
@@ -643,11 +647,11 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     };
 
     if (Array.isArray(pageId)) {
-      const pages = await wikiClient.getPageById(pageId, thumbNailSize);
+      const pages = await wikiClient.getPageById(pageId, thumbFlags);
       return Promise.all(pages.map(toVolume));
     }
 
-    const page = await wikiClient.getPageById(pageId, thumbNailSize);
+    const page = await wikiClient.getPageById(pageId, thumbFlags);
     if (!page) return null;
 
     return toVolume(page);
@@ -655,20 +659,20 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   async function getCharacter(
     query: string,
-    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: false },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple?: false },
   ): Promise<WikiCharacter | null>;
   async function getCharacter(
     query: string,
-    flags?: Omit<WikiFandomFlags, 'multiple'> & { multiple?: true },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple: true },
   ): Promise<WikiCharacter[]>;
   async function getCharacter(
     query: string,
-    flags: WikiFandomFlags = {},
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'multiple'> = {},
   ): Promise<WikiCharacter[] | WikiCharacter | null> {
     const nQuery = preNormalization(query);
 
     const pages = await wikiClient.getPage(nQuery, {
-      category: flags.categoriesIn ?? [],
+      category: flags.category ?? [],
       categoriesOr: ['Category:Characters'],
       ...(flags.thumbnailSize !== undefined ? { thumbnailSize: flags.thumbnailSize } : {}),
     });
@@ -693,7 +697,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   const getCharacterById = async (
     pageId: number,
-    flags: WikiFandomFlags = {},
+    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
   ): Promise<WikiCharacter | null> => {
     const page = await wikiClient.getPageById(
       pageId,
@@ -706,7 +710,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   const getCharacterAppearances = async (
     characterTitle: string,
-    flags: Pick<WikiFandomFlags, 'sorted'> = {},
+    flags: Pick<WikiFlags, 'sorted'> = {},
   ): Promise<WikiComic[]> => {
     const pageIds = (
       await wikiClient.getCategoryMembers(`Category:${characterTitle}/Appearances`)
