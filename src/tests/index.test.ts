@@ -974,6 +974,32 @@ describe('dc-fandom wikiCharacterBuilder parsing', () => {
     expect(character!.aliases).toEqual([]);
     expect(character!.history).toEqual([]);
   });
+
+  it('populates thumbnail from the page response', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(7, 'Batman', [], BASE_THUMBNAIL))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(7, 'Batman', '{{Character\n| RealName = Bruce Wayne\n}}'),
+      );
+
+    const character = await wiki({ plugin: 'dc-fandom' }).getCharacterById(7);
+    expect(character!.thumbnail).toBe(BASE_THUMBNAIL.replace('/scale-to-width-down/400', ''));
+  });
+
+  it('scales thumbnail URL when flags.thumbnailSize is passed', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(7, 'Batman', [], BASE_THUMBNAIL))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(7, 'Batman', '{{Character\n| RealName = Bruce Wayne\n}}'),
+      );
+
+    const character = await wiki({ plugin: 'dc-fandom' }).getCharacterById(7, {
+      thumbnailSize: 200,
+    });
+    expect(character!.thumbnail).toBe(
+      BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'),
+    );
+  });
 });
 
 describe('dc-fandom getComic flags', () => {

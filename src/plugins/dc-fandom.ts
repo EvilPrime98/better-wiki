@@ -111,6 +111,7 @@ export interface WikiCharacterHistorySection {
 export interface WikiCharacter {
   name: string;
   image: string;
+  thumbnail: string;
   pageId: number;
   realName: string;
   mainAlias: string;
@@ -470,6 +471,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return {
       name: page?.title ?? '',
       image: content['Image']?.replace(/<!--.*?-->/gs, '').trim() ?? '',
+      thumbnail: page?.thumbnail ?? '',
       pageId: page?.id ?? -1,
       realName: content['RealName'] ?? '',
       mainAlias: content['MainAlias'] ?? '',
