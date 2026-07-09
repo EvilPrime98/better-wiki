@@ -617,6 +617,15 @@ describe('wiki plugin system', () => {
     expect(url.origin).toBe('https://dc.fandom.com');
   });
 
+  it('a supplied url override is used for API calls instead of the plugin default', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ query: { search: [] } }));
+    await wiki({ plugin: 'dc-fandom', url: 'https://some-other.fandom.com' }).searchCategories(
+      'batman',
+    );
+    const url = new URL(fetchMock.mock.calls[0]![0] as string);
+    expect(url.origin).toBe('https://some-other.fandom.com');
+  });
+
   it('getComicById returns null when page is not found', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ query: { pages: {} } }));
     const result = await wiki({ plugin: 'dc-fandom' }).getComicById(999);

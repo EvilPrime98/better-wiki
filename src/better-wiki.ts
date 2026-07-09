@@ -76,10 +76,15 @@ const DEFAULT_OPTIONS: Required<WikiOptions> = {
  * Creates a wiki client for `url`, extended with the named plugin's methods.
  *
  * @param options - Client options plus the `plugin` to load.
+ * @param options.url - Overrides the plugin's default wiki URL, letting the plugin's
+ *   methods run against a different MediaWiki instance. Plugins parse infobox field
+ *   names and category names specific to their default wiki's schema, so methods may
+ *   return incomplete or empty results on a wiki whose schema differs — see the
+ *   plugin's own docs for which conventions it assumes.
  * @throws If `options.plugin` isn't a registered plugin name.
  */
 export function wiki<K extends PluginName>(
-  options: WikiOptions & { plugin: K },
+  options: WikiOptions & { plugin: K; url?: string },
 ): Wiki & PluginReturn<K>;
 /**
  * Creates a base wiki client for the MediaWiki site at `url`.
@@ -89,7 +94,7 @@ export function wiki<K extends PluginName>(
  */
 export function wiki(url: string, options?: WikiOptions): Wiki;
 export function wiki(
-  urlOrOptions: string | (WikiOptions & { plugin?: PluginName }),
+  urlOrOptions: string | (WikiOptions & { plugin?: PluginName; url?: string }),
   baseOptions: WikiOptions = {},
 ): Wiki | (Wiki & object) {
   let wikiUrl: string;
@@ -100,10 +105,10 @@ export function wiki(
     wikiUrl = urlOrOptions;
     options = baseOptions;
   } else {
-    const { plugin: key, ...rest } = urlOrOptions;
+    const { plugin: key, url: urlOverride, ...rest } = urlOrOptions;
     if (!key || !(key in PLUGINS)) throw new Error(`Unknown plugin: "${key}"`);
     pluginName = key;
-    wikiUrl = PLUGINS[key].url;
+    wikiUrl = urlOverride ?? PLUGINS[key].url;
     options = rest;
   }
 

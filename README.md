@@ -161,6 +161,16 @@ const allMatches = await dc.getComic('Batman', { multiple: true });
 
 All base `Wiki` methods (`getPage`, `clearCache`, etc.) remain available on the returned client.
 
+### Using a plugin against a different wiki
+
+Pass `url` alongside `plugin` to point the plugin's methods at any MediaWiki instance instead of its default wiki:
+
+```ts
+const otherWiki = wiki({ plugin: 'dc-fandom', url: 'https://some-other.fandom.com' });
+```
+
+**Not all wikis are compatible with all plugins.** A plugin's parsing logic is written against its default wiki's specific infobox field names and category names (e.g. `dc-fandom` expects `Image`, `RealName`, `Category:Comics`, etc. on `dc.fandom.com`). Pointing a plugin at a wiki with a different schema will not throw, but its methods may return partial or empty results if that wiki's pages don't follow the same conventions.
+
 ### `dc-fandom` plugin
 
 Targets `https://dc.fandom.com`. Adds:

@@ -161,6 +161,13 @@ const byReleaseDate = (a: WikiComic, b: WikiComic): number => {
  * Extends a base {@link Wiki} client with DC Fandom-specific lookups for comics,
  * volumes, and characters, built on top of the base client's generic page search.
  *
+ * Parsing here is coupled to DC Fandom's own infobox field names (e.g. `Image`,
+ * `RealName`, `StoryArcs`) and category names (e.g. `Category:Comics`,
+ * `Category:Characters`). Pointing this plugin at a different wiki via
+ * `wiki({ plugin: 'dc-fandom', url: ... })` will run without error, but on a wiki
+ * whose schema doesn't follow the same conventions, results may come back partially
+ * or entirely empty rather than throwing.
+ *
  * @param wikiClient - The base client to build on, typically for `https://dc.fandom.com`.
  * @returns An object with `getComic`, `getComicById`, `getVolume`, `getVolumeById`,
  *   `getCharacter`, `getCharacterById`, and `getCharacterAppearances`.
