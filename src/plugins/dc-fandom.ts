@@ -580,9 +580,12 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
     }
 
+    if (pages.length === 0) return null;
+
     const queryYear = extractYear(query);
     const best = selectBest(candidates, nQuery, queryYear);
-    return wikiComicBuilder(best?.page, best?.content ?? ({} as WikiStrContent));
+    if (!best) return null;
+    return wikiComicBuilder(best.page, best.content ?? ({} as WikiStrContent));
   }
 
   /**

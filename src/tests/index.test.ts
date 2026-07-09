@@ -667,6 +667,49 @@ describe('wiki plugin system', () => {
     expect(result).toEqual([]);
   });
 
+  it('getComic returns null when no pages found', async () => {
+    // getPage internal calls: generator search → returns empty
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        batchcomplete: '',
+        continue: { gsroffset: 0, continue: '' },
+        query: { pages: {} },
+      }),
+    );
+    const result = await wiki({ plugin: 'dc-fandom' }).getComic('Batman Year One.cbz');
+    expect(result).toBeNull();
+  });
+
+  it('getComic returns null when pages exist but none fuzzy-match the query', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman Vol 1 7',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        comicWikitextResponse(
+          42,
+          'Batman Vol 1 7',
+          '{{ComicInfobox\n| Volume = 1\n| Issue = 7\n}}',
+        ),
+      );
+
+    const result = await wiki({ plugin: 'dc-fandom' }).getComic('Zzyzx Omega Quantum Nonsense');
+    expect(result).toBeNull();
+  });
+
   it('exposes getCharacter', () => {
     expect(typeof wiki({ plugin: 'dc-fandom' }).getCharacter).toBe('function');
   });
