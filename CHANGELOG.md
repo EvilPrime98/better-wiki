@@ -1,5 +1,17 @@
 # better-wiki
 
+## 0.11.0
+
+### Minor Changes
+
+- 1b8d5bf: Add a `thumbnail` field to `WikiCharacter`, populated from the resolved page thumbnail URL (same mechanism already used by `WikiComic.cover` and `WikiVolume.thumbnail`). The existing `image` field is unchanged and still reflects the raw infobox `Image` value. Pass `flags.thumbnailSize` to `getCharacter`/`getCharacterById` to scale the thumbnail URL; it is populated at a default width otherwise.
+
+### Patch Changes
+
+- 4f9583e: Fix `getComic(query)` (single-result overload) to return `null` when no matching page is found, instead of a fully-defaulted `WikiComic` object with `pageId: -1` and empty fields. This aligns behavior with the method's documented `WikiComic | null` return type and matches the existing zero-match guard already used in `getCharacter` and `getVolume`.
+
+  Consumers that previously detected "no match" by checking `pageId === -1` should switch to checking for `null`.
+
 ## 0.10.0
 
 ### Minor Changes
