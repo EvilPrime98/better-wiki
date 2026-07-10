@@ -175,20 +175,21 @@ const otherWiki = wiki({ plugin: 'dc-fandom', url: 'https://some-other.fandom.co
 
 Targets `https://dc.fandom.com`. Adds:
 
-| Method                                       | Returns                 | Description                                  |
-| -------------------------------------------- | ----------------------- | -------------------------------------------- |
-| `getComic(query, flags?)`                    | `WikiComic \| null`     | Best-match comic by search query             |
-| `getComic(query, { multiple: true })`        | `WikiComic[]`           | All matching comics                          |
-| `getComicById(pageId, flags?)`               | `WikiComic \| null`     | Comic by MediaWiki page ID                   |
-| `getComicById(pageIds[], flags?)`            | `WikiComic[]`           | Batch comic lookup by IDs                    |
-| `getVolume(query, flags?)`                   | `WikiVolume \| null`    | Best-match volume by search query            |
-| `getVolume(query, { multiple: true })`       | `WikiVolume[]`          | All matching volumes                         |
-| `getVolumeById(pageId, flags?)`              | `WikiVolume \| null`    | Volume by MediaWiki page ID                  |
-| `getVolumeById(pageIds[], flags?)`           | `WikiVolume[]`          | Batch volume lookup by IDs                   |
-| `getCharacter(query, flags?)`                | `WikiCharacter \| null` | Best-match character by search query         |
-| `getCharacter(query, { multiple: true })`    | `WikiCharacter[]`       | All matching characters                      |
-| `getCharacterById(pageId, flags?)`           | `WikiCharacter \| null` | Character by MediaWiki page ID               |
-| `getCharacterAppearances(title, { sorted })` | `WikiComic[]`           | All comics in `Category:<title>/Appearances` |
+| Method                                        | Returns                 | Description                                                          |
+| --------------------------------------------- | ----------------------- | -------------------------------------------------------------------- |
+| `getComic(query, flags?)`                     | `WikiComic \| null`     | Best-match comic by search query                                     |
+| `getComic(query, { multiple: true })`         | `WikiComic[]`           | All matching comics                                                  |
+| `getComicById(pageId, flags?)`                | `WikiComic \| null`     | Comic by MediaWiki page ID                                           |
+| `getComicById(pageIds[], flags?)`             | `WikiComic[]`           | Batch comic lookup by IDs                                            |
+| `getVolume(query, flags?)`                    | `WikiVolume \| null`    | Best-match volume by search query                                    |
+| `getVolume(query, { multiple: true })`        | `WikiVolume[]`          | All matching volumes                                                 |
+| `getVolumeById(pageId, flags?)`               | `WikiVolume \| null`    | Volume by MediaWiki page ID                                          |
+| `getVolumeById(pageIds[], flags?)`            | `WikiVolume[]`          | Batch volume lookup by IDs                                           |
+| `getCharacter(query, flags?)`                 | `WikiCharacter \| null` | Best-match character by search query                                 |
+| `getCharacter(query, { multiple: true })`     | `WikiCharacter[]`       | All matching characters                                              |
+| `getCharacterById(pageId, flags?)`            | `WikiCharacter \| null` | Character by MediaWiki page ID                                       |
+| `getCharacterAppearances(title, { sorted })`  | `WikiComic[]`           | All comics in `Category:<title>/Appearances`                         |
+| `getCharacterAppearances(pageId, { sorted })` | `WikiComic[]`           | Same, resolving the character's title from a MediaWiki page ID first |
 
 A `WikiCharacter` carries bio fields (`realName`, `aliases`, `alignment`, …), parsed `history` sections, list fields (`powers`, `abilities`, `equipment`, …), an optional `quotation`, and a `getAppearances({ sorted? })` method returning its Appearances comics.
 

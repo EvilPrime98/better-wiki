@@ -936,6 +936,39 @@ describe('dc-fandom getCharacterAppearances (standalone)', () => {
     expect(result[0]!.releaseDate.releaseYear).toBe('2019');
     expect(result[1]!.releaseDate.releaseYear).toBe('2020');
   });
+
+  it('resolves a pageId to its title before looking up the appearances category', async () => {
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(7, 'Batman'))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: { categorymembers: [{ pageid: 42, ns: 0, title: 'Batman Vol 1 1' }] },
+        }),
+      )
+      .mockResolvedValueOnce(pageByIdResponse(42, 'Batman Vol 1 1'))
+      .mockResolvedValueOnce(
+        comicWikitextResponse(
+          42,
+          'Batman Vol 1 1',
+          '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n| Year = 2020\n| Month = June\n| Day = 1\n}}',
+        ),
+      );
+
+    const result = await wiki({ plugin: 'dc-fandom' }).getCharacterAppearances(7, {
+      sorted: false,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.title).toBe('Batman Vol 1 1');
+    const secondUrl = new URL(fetchMock.mock.calls[1]![0] as string);
+    expect(secondUrl.searchParams.get('cmtitle')).toBe('Category:Batman/Appearances');
+  });
+
+  it('returns an empty array when the pageId does not resolve to a page', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ query: { pages: {} } }));
+
+    const result = await wiki({ plugin: 'dc-fandom' }).getCharacterAppearances(999);
+    expect(result).toEqual([]);
+  });
 });
 
 describe('dc-fandom wikiCharacterBuilder parsing', () => {

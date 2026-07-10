@@ -785,10 +785,32 @@ export function dcFandomPlugin(wikiClient: Wiki) {
    * @param characterTitle - Exact page title of the character.
    * @param flags - Only `sorted` is used, to sort results by release date.
    */
-  const getCharacterAppearances = async (
+  async function getCharacterAppearances(
     characterTitle: string,
+    flags?: Pick<WikiFlags, 'sorted'>,
+  ): Promise<WikiComic[]>;
+  /**
+   * Fetches every comic a character appears in, via the wiki's `Category:<title>/Appearances` category.
+   *
+   * @param pageId - The character page's MediaWiki page ID.
+   * @param flags - Only `sorted` is used, to sort results by release date.
+   */
+  async function getCharacterAppearances(
+    pageId: number,
+    flags?: Pick<WikiFlags, 'sorted'>,
+  ): Promise<WikiComic[]>;
+  async function getCharacterAppearances(
+    characterTitleOrId: string | number,
     flags: Pick<WikiFlags, 'sorted'> = {},
-  ): Promise<WikiComic[]> => {
+  ): Promise<WikiComic[]> {
+    let characterTitle = characterTitleOrId;
+
+    if (typeof characterTitleOrId === 'number') {
+      const page = await wikiClient.getPageById(characterTitleOrId);
+      if (!page) return [];
+      characterTitle = page.title;
+    }
+
     const pageIds = (
       await wikiClient.getCategoryMembers(`Category:${characterTitle}/Appearances`)
     ).map((t) => t.pageid);
@@ -798,7 +820,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     );
 
     return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
-  };
+  }
 
   return {
     getComic,
