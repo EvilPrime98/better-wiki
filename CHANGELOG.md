@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.13.0
+
+### Minor Changes
+
+- 8fc4682: `getCharacterAppearances` now also accepts a MediaWiki page ID as its first argument, resolving the page's title before looking up its `Category:<title>/Appearances` members. Previously only a `characterTitle: string` was accepted, requiring callers with just a page ID to resolve the title themselves first — matching the existing `getComicById`/`getVolumeById`/`getPageById` pattern of supporting both a string and a pageId lookup.
+
 ## 0.12.0
 
 ### Minor Changes
