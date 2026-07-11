@@ -193,7 +193,7 @@ Targets `https://dc.fandom.com`. Adds:
 
 A `WikiCharacter` carries bio fields (`realName`, `aliases`, `alignment`, …), parsed `history` sections, list fields (`powers`, `abilities`, `equipment`, …), an optional `quotation`, and a `getAppearances({ sorted? })` method returning its Appearances comics.
 
-A `WikiVolume` carries series metadata (`startDate`, `endDate`, `creators`, `storyArcs`, …), its raw `issueList` (title strings), and a `getComics({ sorted? })` method that resolves `issueList` into full `WikiComic` objects.
+A `WikiVolume` carries series metadata (`startDate`, `endDate`, `creators`, `storyArcs`, …), its raw `issueList` (title strings), and a `getComics({ thumbnailSize?, includeCollections?, category?, sorted? })` method that resolves `issueList` into full `WikiComic` objects, forwarding those flags to the underlying `getComic` lookups.
 
 `getComic` accepts additional flags:
 

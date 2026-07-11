@@ -1396,6 +1396,44 @@ describe('dc-fandom volume.getComics', () => {
     expect(result[0]!.releaseDate.releaseYear).toBe('2019');
     expect(result[1]!.releaseDate.releaseYear).toBe('2020');
   });
+
+  it('forwards the category flag through to the underlying getComic calls', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': { pageid: 42, ns: 0, title: 'Batman Vol 4', index: 0, categories: [] },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        revisionsResponse(42, 'Batman Vol 4', volumeWikitext('{{a|Batman Vol 1 1}}')),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          query: {
+            pages: {
+              '1': {
+                pageid: 1,
+                ns: 0,
+                title: 'Batman Vol 1 1',
+                index: 0,
+                // Belongs to Category:Comics (satisfies getComic's default categoriesOr)
+                // but not to the category required by the forwarded `category` flag.
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      );
+
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42);
+    const result = await volume!.getComics({ category: ['Category:Requested'] });
+    expect(result).toEqual([]);
+  });
 });
 
 describe('getPage', () => {
