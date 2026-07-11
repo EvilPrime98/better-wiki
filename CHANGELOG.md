@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.14.1
+
+### Patch Changes
+
+- afb739c: `WikiVolume.getComics` and `resolveVolumeComics` now accept and forward `thumbnailSize`, `includeCollections`, and `category`, in addition to `sorted`, matching the flags supported by `getComic`.
+
 ## 0.14.0
 
 ### Minor Changes
