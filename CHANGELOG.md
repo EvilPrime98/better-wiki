@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.14.0
+
+### Minor Changes
+
+- 88daf3e: Add `WikiVolume.getComics({ sorted? })`, resolving a volume's `issueList` into full `WikiComic` objects.
+
 ## 0.13.0
 
 ### Minor Changes
