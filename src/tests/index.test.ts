@@ -1251,6 +1251,153 @@ describe('dc-fandom getVolumeById', () => {
   });
 });
 
+describe('dc-fandom volume.getComics', () => {
+  const volumeWikitext = (issueList: string) =>
+    `{{VolumeInfobox\n| Type = Ongoing\n| IssueList = ${issueList}\n}}`;
+
+  it('resolves issueList entries into WikiComic objects', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': { pageid: 42, ns: 0, title: 'Batman Vol 4', index: 0, categories: [] },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        revisionsResponse(42, 'Batman Vol 4', volumeWikitext('{{a|Batman Vol 1 1}}')),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          query: {
+            pages: {
+              '1': {
+                pageid: 1,
+                ns: 0,
+                title: 'Batman Vol 1 1',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        comicWikitextResponse(1, 'Batman Vol 1 1', '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n}}'),
+      );
+
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42);
+    const result = await volume!.getComics();
+    expect(result).toHaveLength(1);
+    expect(result[0]!.title).toBe('Batman Vol 1 1');
+  });
+
+  it('drops issue titles that do not resolve to a page', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': { pageid: 42, ns: 0, title: 'Batman Vol 4', index: 0, categories: [] },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        revisionsResponse(42, 'Batman Vol 4', volumeWikitext('{{a|Nonexistent Issue}}')),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          continue: { gsroffset: 0, continue: '' },
+          query: { pages: {} },
+        }),
+      );
+
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42);
+    const result = await volume!.getComics();
+    expect(result).toEqual([]);
+  });
+
+  it('sorts results chronologically when sorted: true', async () => {
+    // Both issues are resolved concurrently (Promise.all), so fetch-call order
+    // between them is not guaranteed. Dispatch by URL instead of a fixed queue.
+    const comicsByTitle: Record<string, { pageid: number; year: string; month: string }> = {
+      'Batman Vol 1 1': { pageid: 1, year: '2020', month: 'June' },
+      'Batman Vol 1 2': { pageid: 2, year: '2019', month: 'January' },
+    };
+    const comicsById: Record<number, string> = {
+      1: 'Batman Vol 1 1',
+      2: 'Batman Vol 1 2',
+    };
+
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': { pageid: 42, ns: 0, title: 'Batman Vol 4', index: 0, categories: [] },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        revisionsResponse(
+          42,
+          'Batman Vol 4',
+          volumeWikitext('{{a|Batman Vol 1 1}}\n{{a|Batman Vol 1 2}}'),
+        ),
+      )
+      .mockImplementation(
+        dispatchByUrl as unknown as Parameters<typeof fetchMock.mockImplementation>[0],
+      );
+
+    function dispatchByUrl(input: RequestInfo | URL): Promise<Response> {
+      const url = new URL(input as string);
+      const search = url.searchParams.get('gsrsearch');
+      if (search !== null) {
+        const match = comicsByTitle[search]!;
+        return Promise.resolve(
+          jsonResponse({
+            batchcomplete: '',
+            query: {
+              pages: {
+                [String(match.pageid)]: {
+                  pageid: match.pageid,
+                  ns: 0,
+                  title: search,
+                  index: 0,
+                  categories: [{ ns: 14, title: 'Category:Comics' }],
+                },
+              },
+            },
+          }),
+        );
+      }
+
+      const pageid = Number(url.searchParams.get('pageids'));
+      const title = comicsById[pageid]!;
+      const info = comicsByTitle[title]!;
+      return Promise.resolve(
+        comicWikitextResponse(
+          pageid,
+          title,
+          `{{ComicInfobox\n| Volume = 1\n| Issue = ${pageid}\n| Year = ${info.year}\n| Month = ${info.month}\n| Day = 1\n}}`,
+        ),
+      );
+    }
+
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42);
+    const result = await volume!.getComics({ sorted: true });
+    expect(result).toHaveLength(2);
+    expect(result[0]!.releaseDate.releaseYear).toBe('2019');
+    expect(result[1]!.releaseDate.releaseYear).toBe('2020');
+  });
+});
+
 describe('getPage', () => {
   it('returns WikiPages with correct ids and titles', async () => {
     fetchMock

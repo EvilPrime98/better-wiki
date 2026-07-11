@@ -99,6 +99,8 @@ export interface WikiVolume {
     year: string;
   }[];
   issueList: string[];
+  /** Fetches the comics that are part of this volume, resolved from `issueList`. */
+  getComics(flags?: Pick<WikiFlags, 'sorted'>): Promise<WikiComic[]>;
 }
 
 /** A single heading/text block from a character's "History" section. */
@@ -468,6 +470,9 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       issueList: issueList,
       annualIssues: collectNameYear(content, 'Annual'),
       specialIssues: collectNameYear(content, 'Special'),
+      getComics(flags: Pick<WikiFlags, 'sorted'> = {}): Promise<WikiComic[]> {
+        return resolveVolumeComics(issueList, flags);
+      },
     };
   };
 
@@ -713,6 +718,21 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
     return toVolume(page);
   }
+
+  /**
+   * Resolves a volume's `issueList` (title strings) into full {@link WikiComic} objects
+   * via {@link getComic}, dropping any titles that don't resolve to a page.
+   */
+  const resolveVolumeComics = async (
+    issueList: string[],
+    flags: Pick<WikiFlags, 'sorted'> = {},
+  ): Promise<WikiComic[]> => {
+    const comics = (await Promise.all(issueList.map((title) => getComic(title)))).filter(
+      (c): c is WikiComic => c !== null,
+    );
+
+    return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
+  };
 
   /**
    * Finds the best-matching character for `query`, fuzzy-matched against page titles.
