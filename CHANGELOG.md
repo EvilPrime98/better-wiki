@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.15.0
+
+### Minor Changes
+
+- 9560639: `WikiPage`, `WikiComic`, `WikiVolume`, and `WikiCharacter` now carry a `sourceWiki` field with the base URL of the wiki the object was fetched from, so results merged from multiple `wiki()` clients can be traced back to their origin.
+
 ## 0.14.1
 
 ### Patch Changes
