@@ -390,6 +390,8 @@ export interface WikiPage {
   canonicalUrl: string;
   thumbnail: string;
   categories: string[];
+  /** Base URL of the wiki this page was fetched from, e.g. `https://dc.fandom.com`. */
+  sourceWiki: string;
   /** Fetches and parses the page's infobox template into a flat key/value map. */
   getStructuredContent: () => Promise<Record<string, string>>;
   /** Fetches the page's raw wikitext content. */

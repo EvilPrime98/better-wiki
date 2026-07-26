@@ -481,6 +481,7 @@ describe('getPageById', () => {
     expect(page!.id).toBe(42);
     expect(page!.title).toBe('Batman');
     expect(page!.thumbnail).toBe('');
+    expect(page!.sourceWiki).toBe('https://dc.fandom.com');
   });
 
   it('populates thumbnail from API response', async () => {
@@ -659,6 +660,34 @@ describe('wiki plugin system', () => {
     expect(comic!.volume).toBe('1');
     expect(comic!.issue).toBe('7');
     expect(comic!.credits.writers).toContain('Grant Morrison');
+    expect(comic!.sourceWiki).toBe('https://dc.fandom.com');
+  });
+
+  it('getComicById reflects a supplied url override in sourceWiki', async () => {
+    const wikitext = '{{ComicInfobox\n| Volume = 1\n| Issue = 7\n}}';
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman Vol 1 7',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(comicWikitextResponse(42, 'Batman Vol 1 7', wikitext));
+
+    const comic = await wiki({
+      plugin: 'dc-fandom',
+      url: 'https://some-other.fandom.com',
+    }).getComicById(42);
+    expect(comic!.sourceWiki).toBe('https://some-other.fandom.com');
   });
 
   it('getComic with multiple:true returns empty array when no pages found', async () => {
@@ -1002,6 +1031,7 @@ describe('dc-fandom wikiCharacterBuilder parsing', () => {
       { heading: 'Origin', text: 'His parents were killed.' },
       { heading: 'Career', text: 'He fights crime.' },
     ]);
+    expect(character!.sourceWiki).toBe('https://dc.fandom.com');
   });
 
   it('omits quotation when no quote fields are present', async () => {
@@ -1204,6 +1234,7 @@ describe('dc-fandom getVolumeById', () => {
     expect(volume!.title).toBe('Batman Vol 4');
     expect(volume!.pageId).toBe(42);
     expect(volume!.startDate.year).toBe('2011');
+    expect(volume!.sourceWiki).toBe('https://dc.fandom.com');
   });
 
   it('scales thumbnail URL when flags.thumbnailSize is passed', async () => {

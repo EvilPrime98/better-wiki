@@ -453,6 +453,7 @@ export function wiki(
       thumbnail: page.thumbnail || '',
       categories: page.categories.map((c) => c.title),
       canonicalUrl: page.canonicalUrl,
+      sourceWiki: wikiUrl,
       getStructuredContent: async () => {
         const pageContent = await getPageContent(page.pageid);
         return parseMediaWikiTemplate(pageContent ?? '');

@@ -110,6 +110,7 @@ Pass `flags` to any page-fetching method to filter or augment results:
 | `thumbnail`    | `string`   | Thumbnail URL (empty string if the page has no image). |
 | `categories`   | `string[]` | Category titles the page belongs to.                   |
 | `canonicalUrl` | `string`   | Canonical URL of the page.                             |
+| `sourceWiki`   | `string`   | Base URL of the wiki this page was fetched from.       |
 
 ### `WikiSearchGeneratorPageItem` properties
 
@@ -191,9 +192,11 @@ Targets `https://dc.fandom.com`. Adds:
 | `getCharacterAppearances(title, { sorted })`  | `WikiComic[]`           | All comics in `Category:<title>/Appearances`                         |
 | `getCharacterAppearances(pageId, { sorted })` | `WikiComic[]`           | Same, resolving the character's title from a MediaWiki page ID first |
 
-A `WikiCharacter` carries bio fields (`realName`, `aliases`, `alignment`, …), parsed `history` sections, list fields (`powers`, `abilities`, `equipment`, …), an optional `quotation`, and a `getAppearances({ sorted? })` method returning its Appearances comics.
+A `WikiCharacter` carries bio fields (`realName`, `aliases`, `alignment`, …), parsed `history` sections, list fields (`powers`, `abilities`, `equipment`, …), an optional `quotation`, a `getAppearances({ sorted? })` method returning its Appearances comics, and `sourceWiki` — the base URL of the wiki it was fetched from.
 
-A `WikiVolume` carries series metadata (`startDate`, `endDate`, `creators`, `storyArcs`, …), its raw `issueList` (title strings), and a `getComics({ thumbnailSize?, includeCollections?, category?, sorted? })` method that resolves `issueList` into full `WikiComic` objects, forwarding those flags to the underlying `getComic` lookups.
+A `WikiVolume` carries series metadata (`startDate`, `endDate`, `creators`, `storyArcs`, …), its raw `issueList` (title strings), a `getComics({ thumbnailSize?, includeCollections?, category?, sorted? })` method that resolves `issueList` into full `WikiComic` objects, forwarding those flags to the underlying `getComic` lookups, and `sourceWiki` — the base URL of the wiki it was fetched from.
+
+A `WikiComic` likewise carries `sourceWiki` — the base URL of the wiki it was fetched from, useful when merging results across multiple `wiki()` clients.
 
 `getComic` accepts additional flags:
 

@@ -59,6 +59,8 @@ export interface WikiComic {
   coverVariants: WikiComicCoverVariant[];
   notes: string[];
   trivia: string[];
+  /** Base URL of the wiki this comic was fetched from, e.g. `https://dc.fandom.com`. */
+  sourceWiki: string;
 }
 
 /** A comic's release date, as separate day/month/year strings from the infobox. */
@@ -103,6 +105,8 @@ export interface WikiVolume {
   getComics(
     flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'>,
   ): Promise<WikiComic[]>;
+  /** Base URL of the wiki this volume was fetched from, e.g. `https://dc.fandom.com`. */
+  sourceWiki: string;
 }
 
 /** A single heading/text block from a character's "History" section. */
@@ -151,6 +155,8 @@ export interface WikiCharacter {
   trivia: string[];
   /** Fetches the comics this character appears in, via its `Category:.../Appearances` category. */
   getAppearances(flags?: Pick<WikiFlags, 'sorted'>): Promise<WikiComic[]>;
+  /** Base URL of the wiki this character was fetched from, e.g. `https://dc.fandom.com`. */
+  sourceWiki: string;
 }
 
 const byReleaseDate = (a: WikiComic, b: WikiComic): number => {
@@ -433,6 +439,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       coverVariants: buildCoverVariants(content),
       notes: parseBullets(content['Notes']),
       trivia: parseBullets(content['Trivia']),
+      sourceWiki: page?.sourceWiki || '',
     };
   };
 
@@ -477,6 +484,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       ): Promise<WikiComic[]> {
         return resolveVolumeComics(issueList, flags);
       },
+      sourceWiki: page?.sourceWiki || '',
     };
   };
 
@@ -536,6 +544,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       getAppearances(flags: Pick<WikiFlags, 'sorted'> = {}): Promise<WikiComic[]> {
         return getCharacterAppearances(page?.title ?? '', flags);
       },
+      sourceWiki: page?.sourceWiki || '',
     };
   };
 
