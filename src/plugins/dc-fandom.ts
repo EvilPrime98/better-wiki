@@ -103,7 +103,9 @@ export interface WikiVolume {
   issueList: string[];
   /** Fetches the comics that are part of this volume, resolved from `issueList`. */
   getComics(
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+      fields?: (keyof WikiComic)[];
+    },
   ): Promise<WikiComic[]>;
   /** Base URL of the wiki this volume was fetched from, e.g. `https://dc.fandom.com`. */
   sourceWiki: string;
@@ -154,7 +156,9 @@ export interface WikiCharacter {
   notes: string[];
   trivia: string[];
   /** Fetches the comics this character appears in, via its `Category:.../Appearances` category. */
-  getAppearances(flags?: Pick<WikiFlags, 'sorted'>): Promise<WikiComic[]>;
+  getAppearances(
+    flags?: Pick<WikiFlags, 'sorted'> & { fields?: (keyof WikiComic)[] },
+  ): Promise<WikiComic[]>;
   /** Base URL of the wiki this character was fetched from, e.g. `https://dc.fandom.com`. */
   sourceWiki: string;
 }
@@ -410,142 +414,203 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
   //BUILDERS
 
-  const wikiComicBuilder = (page: WikiPage | undefined, content: WikiStrContent): WikiComic => {
-    return {
-      title: page?.title || '',
-      volume: content['Volume'] || '',
-      issue: content['Issue'] || '',
-      cover: page?.thumbnail || '',
-      pageId: page?.id || -1,
-      releaseDate: {
+  /**
+   * Builds `T` by invoking only the field builders named in `fields`; when `fields` is
+   * `undefined`, every builder runs (today's full-object behavior). Field names not present
+   * in `fieldBuilders` are ignored rather than throwing, so passing a non-buildable key
+   * (e.g. an always-attached accessor method's name) is a harmless no-op.
+   */
+  const buildFromFieldMap = <T extends object>(
+    fieldBuilders: { [K in keyof T]: () => T[K] },
+    fields?: (keyof T)[],
+  ): T => {
+    const keys = (fields ?? (Object.keys(fieldBuilders) as (keyof T)[])).filter((key) =>
+      Object.prototype.hasOwnProperty.call(fieldBuilders, key),
+    );
+    const result = {} as T;
+    for (const key of keys) {
+      const value = fieldBuilders[key]();
+      // Omit rather than assign `undefined`, matching the original object-literal spread
+      // behavior and satisfying `exactOptionalPropertyTypes` for optional fields (e.g. quotation).
+      if (value !== undefined) {
+        // Each key's builder does return T[key] by construction; TS can't narrow a generic
+        // mapped-type union across a runtime loop.
+        (result as Record<string, unknown>)[key as string] = value;
+      }
+    }
+    return result;
+  };
+
+  const wikiComicBuilder = (
+    page: WikiPage | undefined,
+    content: WikiStrContent,
+    fields?: (keyof WikiComic)[],
+  ): WikiComic => {
+    const COMIC_FIELD_BUILDERS: { [K in keyof WikiComic]: () => WikiComic[K] } = {
+      title: () => page?.title || '',
+      volume: () => content['Volume'] || '',
+      issue: () => content['Issue'] || '',
+      cover: () => page?.thumbnail || '',
+      pageId: () => page?.id || -1,
+      releaseDate: () => ({
         releaseDay: content['Day'] || '',
         releaseMonth: content['Month'] || '',
         releaseYear: content['Year'] || '',
-      },
-      credits: buildCredits(content),
-      synopsis: collectSequential(content, (i) => `Synopsis${i}`).join('\n\n') || '',
-      rating: content['Rating'] || '',
-      event: content['Event'] || '',
-      storyTitles: collectSequential(content, (i) => `StoryTitle${i}`),
-      appearing: parseAppearing(content['Appearing1']),
-      ...(content['Quotation'] || content['Speaker']
-        ? {
-            quotation: {
+      }),
+      credits: () => buildCredits(content),
+      synopsis: () => collectSequential(content, (i) => `Synopsis${i}`).join('\n\n') || '',
+      rating: () => content['Rating'] || '',
+      event: () => content['Event'] || '',
+      storyTitles: () => collectSequential(content, (i) => `StoryTitle${i}`),
+      appearing: () => parseAppearing(content['Appearing1']),
+      quotation: () =>
+        content['Quotation'] || content['Speaker']
+          ? {
               ...(content['Quotation'] ? { quote: content['Quotation'] } : {}),
               ...(content['Speaker'] ? { speaker: content['Speaker'] } : {}),
-            },
-          }
-        : {}),
-      coverVariants: buildCoverVariants(content),
-      notes: parseBullets(content['Notes']),
-      trivia: parseBullets(content['Trivia']),
-      sourceWiki: page?.sourceWiki || '',
+            }
+          : undefined,
+      coverVariants: () => buildCoverVariants(content),
+      notes: () => parseBullets(content['Notes']),
+      trivia: () => parseBullets(content['Trivia']),
+      sourceWiki: () => page?.sourceWiki || '',
     };
+
+    return buildFromFieldMap(COMIC_FIELD_BUILDERS, fields);
   };
 
-  const wikiVolumeBuilder = (page: WikiPage | undefined, content: WikiStrContent): WikiVolume => {
-    const storyArcs = serializeStories(content['StoryArcs'] || '');
-
-    const crossovers = serializeStories(content['Crossovers'] || '');
-
+  const wikiVolumeBuilder = (
+    page: WikiPage | undefined,
+    content: WikiStrContent,
+    fields?: (keyof WikiVolume)[],
+  ): WikiVolume => {
+    // issueList is needed unconditionally: getComics() is always attached regardless of `fields`.
     const issueList =
       content['IssueList']
         ?.split('\n')
         .map((issue) => issue.split('|')[1]?.replaceAll('}', '') ?? '') ?? [];
 
-    const history = content['History']?.replace(/[[\]']/g, '');
-
-    return {
-      title: page?.title ?? '',
-      thumbnail: page?.thumbnail ?? '',
-      pageId: page?.id ?? -1,
-      type: content['Type'] ?? '',
-      startDate: {
+    const VOLUME_FIELD_BUILDERS: {
+      [K in Exclude<keyof WikiVolume, 'getComics'>]: () => WikiVolume[K];
+    } = {
+      title: () => page?.title ?? '',
+      thumbnail: () => page?.thumbnail ?? '',
+      pageId: () => page?.id ?? -1,
+      type: () => content['Type'] ?? '',
+      startDate: () => ({
         month: content['StartMonth'] ?? '',
         year: content['StartYear'] ?? '',
-      },
-      endDate: {
+      }),
+      endDate: () => ({
         month: content['EndMonth'] ?? '',
         year: content['EndYear'] ?? '',
-      },
-      previousVolume: content['PreviousVol'] ?? '',
-      nextVolume: content['NextVol'] ?? '',
-      creators: content['Creators']?.split(';').map((c) => c.trim()) ?? [],
-      featured: content['Featured']?.split(',').map((f) => f.trim()) ?? [],
-      storyArcs: storyArcs || [],
-      crossovers: crossovers || [],
-      history: history ?? '',
-      totalIssues: content['TotalIssues'] ?? '',
-      issueList: issueList,
-      annualIssues: collectNameYear(content, 'Annual'),
-      specialIssues: collectNameYear(content, 'Special'),
+      }),
+      previousVolume: () => content['PreviousVol'] ?? '',
+      nextVolume: () => content['NextVol'] ?? '',
+      creators: () => content['Creators']?.split(';').map((c) => c.trim()) ?? [],
+      featured: () => content['Featured']?.split(',').map((f) => f.trim()) ?? [],
+      storyArcs: () => serializeStories(content['StoryArcs'] || '') || [],
+      crossovers: () => serializeStories(content['Crossovers'] || '') || [],
+      history: () => content['History']?.replace(/[[\]']/g, '') ?? '',
+      totalIssues: () => content['TotalIssues'] ?? '',
+      issueList: () => issueList,
+      annualIssues: () => collectNameYear(content, 'Annual'),
+      specialIssues: () => collectNameYear(content, 'Special'),
+      sourceWiki: () => page?.sourceWiki || '',
+    };
+
+    const data = buildFromFieldMap(
+      VOLUME_FIELD_BUILDERS,
+      fields as (keyof Omit<WikiVolume, 'getComics'>)[] | undefined,
+    );
+
+    return {
+      ...data,
       getComics(
-        flags: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> = {},
+        flags: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+          fields?: (keyof WikiComic)[];
+        } = {},
       ): Promise<WikiComic[]> {
         return resolveVolumeComics(issueList, flags);
       },
-      sourceWiki: page?.sourceWiki || '',
     };
   };
 
   const wikiCharacterBuilder = (
     page: WikiPage | undefined,
     content: WikiStrContent,
+    fields?: (keyof WikiCharacter)[],
   ): WikiCharacter => {
-    return {
-      name: page?.title ?? '',
-      image: content['Image']?.replace(/<!--.*?-->/gs, '').trim() ?? '',
-      thumbnail: page?.thumbnail ?? '',
-      pageId: page?.id ?? -1,
-      realName: content['RealName'] ?? '',
-      mainAlias: content['MainAlias'] ?? '',
-      aliases: splitAliases(content['Aliases']),
-      alignment: stripWiki(content['Alignment'] ?? ''),
-      identity: content['Identity'] ?? '',
-      affiliation: content['Affiliation'] ?? '',
-      relatives: content['Relatives'] ?? '',
-      universe: content['Universe'] ?? '',
-      baseOfOperations: content['BaseOfOperations'] ?? '',
-      alienRace: content['AlienRace'] ?? '',
-      gender: content['Gender'] ?? '',
-      height: content['Height'] ?? '',
-      weight: content['Weight'] ?? '',
-      eyes: content['Eyes'] ?? '',
-      hair: content['Hair'] ?? '',
-      citizenship: content['Citizenship'] ?? '',
-      maritalStatus: content['MaritalStatus'] ?? '',
-      occupation: content['Occupation'] ?? '',
-      creators:
+    const CHARACTER_FIELD_BUILDERS: {
+      [K in Exclude<keyof WikiCharacter, 'getAppearances'>]: () => WikiCharacter[K];
+    } = {
+      name: () => page?.title ?? '',
+      image: () => content['Image']?.replace(/<!--.*?-->/gs, '').trim() ?? '',
+      thumbnail: () => page?.thumbnail ?? '',
+      pageId: () => page?.id ?? -1,
+      realName: () => content['RealName'] ?? '',
+      mainAlias: () => content['MainAlias'] ?? '',
+      aliases: () => splitAliases(content['Aliases']),
+      alignment: () => stripWiki(content['Alignment'] ?? ''),
+      identity: () => content['Identity'] ?? '',
+      affiliation: () => content['Affiliation'] ?? '',
+      relatives: () => content['Relatives'] ?? '',
+      universe: () => content['Universe'] ?? '',
+      baseOfOperations: () => content['BaseOfOperations'] ?? '',
+      alienRace: () => content['AlienRace'] ?? '',
+      gender: () => content['Gender'] ?? '',
+      height: () => content['Height'] ?? '',
+      weight: () => content['Weight'] ?? '',
+      eyes: () => content['Eyes'] ?? '',
+      hair: () => content['Hair'] ?? '',
+      citizenship: () => content['Citizenship'] ?? '',
+      maritalStatus: () => content['MaritalStatus'] ?? '',
+      occupation: () => content['Occupation'] ?? '',
+      creators: () =>
         content['Creators']
           ?.split(';')
           .map((c) => c.trim())
           .filter(Boolean) ?? [],
-      first: content['First'] ?? '',
-      last: content['Last'] ?? '',
-      ...(content['Quotation'] || content['Speaker'] || content['QuoteSource']
-        ? {
-            quotation: {
+      first: () => content['First'] ?? '',
+      last: () => content['Last'] ?? '',
+      quotation: () =>
+        content['Quotation'] || content['Speaker'] || content['QuoteSource']
+          ? {
               ...(content['Quotation'] ? { quote: content['Quotation'] } : {}),
               ...(content['Speaker'] ? { speaker: content['Speaker'] } : {}),
               ...(content['QuoteSource'] ? { source: content['QuoteSource'] } : {}),
-            },
-          }
-        : {}),
-      overview: content['Overview'] ?? '',
-      history: parseHistory(content['HistoryText']),
-      powers: parseBullets(content['Powers']),
-      abilities: parseBullets(content['Abilities']),
-      weaknesses: parseBullets(content['Weaknesses']),
-      equipment: parseBullets(content['Equipment']),
-      transportation: parseBullets(content['Transportation']),
-      weapons: parseBullets(content['Weapons']),
-      notes: parseBullets(content['Notes']),
-      trivia: parseBullets(content['Trivia']),
-      getAppearances(flags: Pick<WikiFlags, 'sorted'> = {}): Promise<WikiComic[]> {
+            }
+          : undefined,
+      overview: () => content['Overview'] ?? '',
+      history: () => parseHistory(content['HistoryText']),
+      powers: () => parseBullets(content['Powers']),
+      abilities: () => parseBullets(content['Abilities']),
+      weaknesses: () => parseBullets(content['Weaknesses']),
+      equipment: () => parseBullets(content['Equipment']),
+      transportation: () => parseBullets(content['Transportation']),
+      weapons: () => parseBullets(content['Weapons']),
+      notes: () => parseBullets(content['Notes']),
+      trivia: () => parseBullets(content['Trivia']),
+      sourceWiki: () => page?.sourceWiki || '',
+    };
+
+    const data = buildFromFieldMap(
+      CHARACTER_FIELD_BUILDERS,
+      fields as (keyof Omit<WikiCharacter, 'getAppearances'>)[] | undefined,
+    );
+
+    return {
+      ...data,
+      getAppearances(
+        flags: Pick<WikiFlags, 'sorted'> & { fields?: (keyof WikiComic)[] } = {},
+      ): Promise<WikiComic[]> {
         return getCharacterAppearances(page?.title ?? '', flags);
       },
-      sourceWiki: page?.sourceWiki || '',
-    };
+      // Spreading `data` (whose `quotation` is optional) into a fresh literal makes TS infer
+      // `quotation` as always-present-but-possibly-undefined under exactOptionalPropertyTypes,
+      // which then fails structurally against WikiCharacter's genuinely optional `quotation?`
+      // even though the key is correctly omitted at runtime when there's no quotation.
+    } as WikiCharacter;
   };
 
   //PUBLIC INTERFACE
@@ -561,12 +626,14 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     query: string,
     flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
       multiple?: false;
+      fields?: (keyof WikiComic)[];
     },
   ): Promise<WikiComic | null>;
   async function getComic(
     query: string,
     flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
       multiple: true;
+      fields?: (keyof WikiComic)[];
     },
   ): Promise<WikiComic[]>;
   async function getComic(
@@ -574,7 +641,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     flags: Pick<
       WikiFlags,
       'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'multiple'
-    > = {},
+    > & { fields?: (keyof WikiComic)[] } = {},
   ): Promise<WikiComic[] | WikiComic | null> {
     const nQuery = preNormalization(query);
     const categoriesOr: string[] = ['Category:Comics'];
@@ -603,7 +670,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
     if (flags.multiple === true) {
       if (pages.length === 0) return [];
-      const comics = candidates.map((c) => wikiComicBuilder(c.page, c.content));
+      const comics = candidates.map((c) => wikiComicBuilder(c.page, c.content, flags.fields));
       return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
     }
 
@@ -612,31 +679,35 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     const queryYear = extractYear(query);
     const best = selectBest(candidates, nQuery, queryYear);
     if (!best) return null;
-    return wikiComicBuilder(best.page, best.content ?? ({} as WikiStrContent));
+    return wikiComicBuilder(best.page, best.content ?? ({} as WikiStrContent), flags.fields);
   }
 
   /**
    * Fetches one or more comic issues by their MediaWiki page ID.
    *
    * @param pageId - A single page ID, or an array to fetch several at once.
-   * @param flags - Only `thumbnailSize` is used.
+   * @param flags - Only `thumbnailSize` and `fields` are used.
    */
   async function getComicById(
     pageId: number,
-    flags?: Pick<WikiFlags, 'thumbnailSize'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & { fields?: (keyof WikiComic)[] },
   ): Promise<WikiComic | null>;
   async function getComicById(
     pageId: number[],
-    flags?: Pick<WikiFlags, 'thumbnailSize'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & { fields?: (keyof WikiComic)[] },
   ): Promise<WikiComic[]>;
   async function getComicById(
     pageId: number | number[],
-    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize'> & { fields?: (keyof WikiComic)[] } = {},
   ): Promise<WikiComic | null | WikiComic[]> {
     const thumbFlags = flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {};
 
     const toComic = async (page: WikiPage): Promise<WikiComic> => {
-      return wikiComicBuilder(page, (await page.getStructuredContent()) as WikiStrContent);
+      return wikiComicBuilder(
+        page,
+        (await page.getStructuredContent()) as WikiStrContent,
+        flags.fields,
+      );
     };
 
     if (Array.isArray(pageId)) {
@@ -659,15 +730,20 @@ export function dcFandomPlugin(wikiClient: Wiki) {
    */
   async function getVolume(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize'> & { multiple?: false },
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & {
+      multiple?: false;
+      fields?: (keyof WikiVolume)[];
+    },
   ): Promise<WikiVolume | null>;
   async function getVolume(
     query: string,
-    flags: Pick<WikiFlags, 'thumbnailSize'> & { multiple: true },
+    flags: Pick<WikiFlags, 'thumbnailSize'> & { multiple: true; fields?: (keyof WikiVolume)[] },
   ): Promise<WikiVolume[]>;
   async function getVolume(
     query: string,
-    flags: Pick<WikiFlags, 'thumbnailSize' | 'multiple'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'multiple'> & {
+      fields?: (keyof WikiVolume)[];
+    } = {},
   ): Promise<WikiVolume | null | WikiVolume[]> {
     const nQuery = preNormalization(query);
 
@@ -685,7 +761,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
     if (flags.multiple === true) {
       if (pages.length === 0) return [];
-      return candidates.map((c) => wikiVolumeBuilder(c.page, c.content));
+      return candidates.map((c) => wikiVolumeBuilder(c.page, c.content, flags.fields));
     }
 
     if (pages.length === 0) return null;
@@ -693,32 +769,32 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     const best = selectBest(candidates, nQuery, queryYear);
     if (!best) return null;
 
-    return wikiVolumeBuilder(best.page, best.content);
+    return wikiVolumeBuilder(best.page, best.content, flags.fields);
   }
 
   /**
    * Fetches one or more comic-book volumes by their MediaWiki page ID.
    *
    * @param pageId - A single page ID, or an array to fetch several at once.
-   * @param flags - Only `thumbnailSize` is used.
+   * @param flags - Only `thumbnailSize` and `fields` are used.
    */
   async function getVolumeById(
     pageId: number,
-    flags?: Pick<WikiFlags, 'thumbnailSize'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & { fields?: (keyof WikiVolume)[] },
   ): Promise<WikiVolume | null>;
   async function getVolumeById(
     pageId: number[],
-    flags?: Pick<WikiFlags, 'thumbnailSize'>,
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & { fields?: (keyof WikiVolume)[] },
   ): Promise<WikiVolume[]>;
   async function getVolumeById(
     pageId: number | number[],
-    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize'> & { fields?: (keyof WikiVolume)[] } = {},
   ): Promise<WikiVolume | null | WikiVolume[]> {
     const thumbFlags = flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {};
 
     const toVolume = async (page: WikiPage): Promise<WikiVolume> => {
       const pageStrContent = (await page.getStructuredContent()) as WikiStrContent;
-      return wikiVolumeBuilder(page, pageStrContent);
+      return wikiVolumeBuilder(page, pageStrContent, flags.fields);
     };
 
     if (Array.isArray(pageId)) {
@@ -738,7 +814,9 @@ export function dcFandomPlugin(wikiClient: Wiki) {
    */
   const resolveVolumeComics = async (
     issueList: string[],
-    flags: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+      fields?: (keyof WikiComic)[];
+    } = {},
   ): Promise<WikiComic[]> => {
     const { sorted, ...getComicFlags } = flags;
     const comics = (
@@ -757,15 +835,23 @@ export function dcFandomPlugin(wikiClient: Wiki) {
    */
   async function getCharacter(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple?: false },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & {
+      multiple?: false;
+      fields?: (keyof WikiCharacter)[];
+    },
   ): Promise<WikiCharacter | null>;
   async function getCharacter(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple: true },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & {
+      multiple: true;
+      fields?: (keyof WikiCharacter)[];
+    },
   ): Promise<WikiCharacter[]>;
   async function getCharacter(
     query: string,
-    flags: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'multiple'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'multiple'> & {
+      fields?: (keyof WikiCharacter)[];
+    } = {},
   ): Promise<WikiCharacter[] | WikiCharacter | null> {
     const nQuery = preNormalization(query);
 
@@ -784,25 +870,25 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
     if (flags.multiple === true) {
       if (pages.length === 0) return [];
-      return candidates.map((c) => wikiCharacterBuilder(c.page, c.content));
+      return candidates.map((c) => wikiCharacterBuilder(c.page, c.content, flags.fields));
     }
 
     if (pages.length === 0) return null;
     const best = selectBest(candidates, nQuery, extractYear(query));
     if (!best) return null;
-    return wikiCharacterBuilder(best.page, best.content);
+    return wikiCharacterBuilder(best.page, best.content, flags.fields);
   }
 
   /**
    * Fetches a character by its MediaWiki page ID.
    *
    * @param pageId - The character page's ID.
-   * @param flags - Only `thumbnailSize` is used.
+   * @param flags - Only `thumbnailSize` and `fields` are used.
    * @returns The character, or `null` if the page doesn't exist.
    */
   const getCharacterById = async (
     pageId: number,
-    flags: Pick<WikiFlags, 'thumbnailSize'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize'> & { fields?: (keyof WikiCharacter)[] } = {},
   ): Promise<WikiCharacter | null> => {
     const page = await wikiClient.getPageById(
       pageId,
@@ -810,7 +896,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     );
     if (!page) return null;
     const content = (await page.getStructuredContent()) as WikiStrContent;
-    return wikiCharacterBuilder(page, content);
+    return wikiCharacterBuilder(page, content, flags.fields);
   };
 
   /**
@@ -821,21 +907,21 @@ export function dcFandomPlugin(wikiClient: Wiki) {
    */
   async function getCharacterAppearances(
     characterTitle: string,
-    flags?: Pick<WikiFlags, 'sorted'>,
+    flags?: Pick<WikiFlags, 'sorted'> & { fields?: (keyof WikiComic)[] },
   ): Promise<WikiComic[]>;
   /**
    * Fetches every comic a character appears in, via the wiki's `Category:<title>/Appearances` category.
    *
    * @param pageId - The character page's MediaWiki page ID.
-   * @param flags - Only `sorted` is used, to sort results by release date.
+   * @param flags - Only `sorted` and `fields` are used.
    */
   async function getCharacterAppearances(
     pageId: number,
-    flags?: Pick<WikiFlags, 'sorted'>,
+    flags?: Pick<WikiFlags, 'sorted'> & { fields?: (keyof WikiComic)[] },
   ): Promise<WikiComic[]>;
   async function getCharacterAppearances(
     characterTitleOrId: string | number,
-    flags: Pick<WikiFlags, 'sorted'> = {},
+    flags: Pick<WikiFlags, 'sorted'> & { fields?: (keyof WikiComic)[] } = {},
   ): Promise<WikiComic[]> {
     let characterTitle = characterTitleOrId;
 
@@ -849,9 +935,11 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       await wikiClient.getCategoryMembers(`Category:${characterTitle}/Appearances`)
     ).map((t) => t.pageid);
 
-    const comics = (await Promise.all(pageIds.map((id) => getComicById(id)))).filter(
-      (c): c is WikiComic => c !== null,
-    );
+    const comics = (
+      await Promise.all(
+        pageIds.map((id) => getComicById(id, flags.fields ? { fields: flags.fields } : undefined)),
+      )
+    ).filter((c): c is WikiComic => c !== null);
 
     return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
   }
