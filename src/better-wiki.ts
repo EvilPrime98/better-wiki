@@ -65,6 +65,7 @@ export {
 
 const DEFAULT_OPTIONS: Required<WikiOptions> = {
   CACHE_TTL: 5 * 60 * 1000,
+  allowCache: true,
   userAgent: 'better-wiki (https://www.npmjs.com/package/better-wiki)',
   timeout: 15_000,
   retries: 2,
@@ -164,6 +165,11 @@ export function wiki(
   };
 
   const getCachedOrFetch = async <T>(url: string): Promise<T> => {
+    if (!config.allowCache) {
+      const response = await fetchWithRetry(url);
+      return (await response.json()) as T;
+    }
+
     const cached = apiCache.get(url);
 
     const now = Date.now();

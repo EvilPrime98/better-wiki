@@ -53,13 +53,14 @@ const structured = await client.getPageContent(page.id, { structured: true });
 
 `wiki(url, options)` accepts an options object (all fields optional):
 
-| Option      | Type     | Default             | Description                                                     |
-| ----------- | -------- | ------------------- | --------------------------------------------------------------- |
-| `CACHE_TTL` | `number` | `300000` (5 min)    | How long, in ms, an API response stays cached.                  |
-| `userAgent` | `string` | `better-wiki (...)` | `User-Agent` header sent with every request.                    |
-| `timeout`   | `number` | `15000`             | Abort a request after this many ms.                             |
-| `retries`   | `number` | `2`                 | Number of retries (with backoff) on a failed/timed-out request. |
-| `publisher` | `string` | `''`                | Publisher name included in series-related data.                 |
+| Option       | Type      | Default             | Description                                                                          |
+| ------------ | --------- | ------------------- | ------------------------------------------------------------------------------------ |
+| `CACHE_TTL`  | `number`  | `300000` (5 min)    | How long, in ms, an API response stays cached. Ignored when `allowCache` is `false`. |
+| `allowCache` | `boolean` | `true`              | When `false`, disables the in-memory response cache entirely.                        |
+| `userAgent`  | `string`  | `better-wiki (...)` | `User-Agent` header sent with every request.                                         |
+| `timeout`    | `number`  | `15000`             | Abort a request after this many ms.                                                  |
+| `retries`    | `number`  | `2`                 | Number of retries (with backoff) on a failed/timed-out request.                      |
+| `publisher`  | `string`  | `''`                | Publisher name included in series-related data.                                      |
 
 ```ts
 const client = wiki('https://dc.fandom.com', {

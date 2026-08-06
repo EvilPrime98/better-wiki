@@ -229,6 +229,22 @@ describe('caching', () => {
     await client.searchCategories('batman');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('does not cache when allowCache is false', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ query: { search: [] } }));
+    const client = wiki('https://dc.fandom.com', { allowCache: false });
+    await client.searchCategories('batman');
+    await client.searchCategories('batman');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('still caches by default when allowCache is omitted', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ query: { search: [] } }));
+    const client = wiki('https://dc.fandom.com');
+    await client.searchCategories('batman');
+    await client.searchCategories('batman');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('retries', () => {
