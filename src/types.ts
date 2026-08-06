@@ -366,6 +366,8 @@ export interface ComicInfo {
 export interface WikiOptions {
   /** Time in ms an API response stays cached. Default: 300000 (5 min). */
   CACHE_TTL?: number;
+  /** When false, disables the in-memory response cache entirely (`CACHE_TTL` is ignored). Default: true. */
+  allowCache?: boolean;
   /** User-Agent header sent with every request (recommended by Fandom/Wikimedia). */
   userAgent?: string;
   /** Abort a request after this many ms. Default: 15000. */
