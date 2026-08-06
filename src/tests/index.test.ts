@@ -1282,6 +1282,141 @@ describe('dc-fandom getVolumeById', () => {
   });
 });
 
+describe('dc-fandom fields option', () => {
+  it('getComicById with fields returns only the requested keys', async () => {
+    const wikitext = '{{ComicInfobox\n| Volume = 1\n| Issue = 7\n| Writer1_1 = Grant Morrison\n}}';
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman Vol 1 7',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(comicWikitextResponse(42, 'Batman Vol 1 7', wikitext));
+
+    const comic = await wiki({ plugin: 'dc-fandom' }).getComicById(42, {
+      fields: ['title', 'issue'],
+    });
+
+    expect(comic!.title).toBe('Batman Vol 1 7');
+    expect(comic!.issue).toBe('7');
+    expect(comic!.volume).toBeUndefined();
+    expect(comic!.credits).toBeUndefined();
+    expect(comic!.pageId).toBeUndefined();
+    expect(Object.keys(comic!).sort()).toEqual(['issue', 'title']);
+  });
+
+  it('getComicById without fields still returns the full object (non-breaking default)', async () => {
+    const wikitext = '{{ComicInfobox\n| Volume = 1\n| Issue = 7\n}}';
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman Vol 1 7',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(comicWikitextResponse(42, 'Batman Vol 1 7', wikitext));
+
+    const comic = await wiki({ plugin: 'dc-fandom' }).getComicById(42);
+
+    expect(Object.keys(comic!).sort()).toEqual(
+      [
+        'appearing',
+        'cover',
+        'coverVariants',
+        'credits',
+        'event',
+        'issue',
+        'notes',
+        'pageId',
+        'rating',
+        'releaseDate',
+        'sourceWiki',
+        'storyTitles',
+        'synopsis',
+        'title',
+        'trivia',
+        'volume',
+      ].sort(),
+    );
+  });
+
+  it('applies fields to every item when fetching an array of IDs', async () => {
+    const wikitext = '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n}}';
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '1': {
+                pageid: 1,
+                ns: 0,
+                title: 'Batman Vol 1 1',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+              '2': {
+                pageid: 2,
+                ns: 0,
+                title: 'Batman Vol 1 2',
+                index: 1,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValue(comicWikitextResponse(0, '', wikitext));
+
+    const comics = await wiki({ plugin: 'dc-fandom' }).getComicById([1, 2], {
+      fields: ['title'],
+    });
+
+    expect(comics).toHaveLength(2);
+    for (const comic of comics) {
+      expect(Object.keys(comic).sort()).toEqual(['title']);
+    }
+  });
+
+  it('volume.getComics stays present and callable even when fields excludes it', async () => {
+    const volumeWikitext = '{{VolumeInfobox\n| Type = Ongoing\n| StartYear = 2011\n}}';
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': { pageid: 42, ns: 0, title: 'Batman Vol 4', index: 0, categories: [] },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(revisionsResponse(42, 'Batman Vol 4', volumeWikitext));
+
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42, { fields: ['title'] });
+
+    expect(Object.keys(volume!).sort()).toEqual(['getComics', 'title']);
+    expect(typeof volume!.getComics).toBe('function');
+  });
+});
+
 describe('dc-fandom volume.getComics', () => {
   const volumeWikitext = (issueList: string) =>
     `{{VolumeInfobox\n| Type = Ongoing\n| IssueList = ${issueList}\n}}`;

@@ -209,6 +209,25 @@ A `WikiComic` likewise carries `sourceWiki` — the base URL of the wiki it was 
 
 Pass `flags.thumbnailSize` (number, px) to scale cover thumbnail URLs.
 
+#### Selecting fields
+
+Every `dc-fandom` lookup method (`getComic`, `getComicById`, `getVolume`, `getVolumeById`,
+`getCharacter`, `getCharacterById`, `getCharacterAppearances`, plus a volume's `getComics()`
+and a character's `getAppearances()`) accepts an optional `fields` flag, typed to the keys of
+the method's result type (e.g. `(keyof WikiComic)[]` for comic lookups). When omitted, the
+full object is returned as before (non-breaking default). When provided, only the requested
+keys are computed and present on the result — unrequested keys are skipped entirely rather
+than computed and discarded, so requesting a small field set also avoids the parsing work for
+everything else. Methods on the result (`getComics`, `getAppearances`) are always present
+regardless of `fields`, since they're accessors rather than data.
+
+```ts
+const comic = await dc.getComic('Batman #700 (2010)', { fields: ['cover', 'credits'] });
+comic!.cover; // present
+comic!.credits; // present
+comic!.title; // undefined — not requested
+```
+
 All returned types (`WikiComic`, `WikiVolume`, `WikiCredits`, `WikiAppearingSection`, etc.) are exported from the package root for use in your own type annotations.
 
 ## Development
