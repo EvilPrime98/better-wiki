@@ -1,5 +1,12 @@
 # better-wiki
 
+## 0.16.0
+
+### Minor Changes
+
+- dea76cd: Added an `allowCache` option to `WikiOptions` (default: `true`) that, when set to `false`, disables the client's in-memory response cache entirely.
+- 8ab5df2: Added an optional `fields` flag to `getComic`, `getComicById`, `getVolume`, `getVolumeById`, `getCharacter`, `getCharacterById`, `getCharacterAppearances`, and the `getComics`/`getAppearances` result accessors, letting consumers request only the properties they need. When provided, unrequested fields are skipped entirely rather than computed and discarded, reducing internal parsing work for large results. Omitting the flag preserves today's full-object behavior.
+
 ## 0.15.0
 
 ### Minor Changes
