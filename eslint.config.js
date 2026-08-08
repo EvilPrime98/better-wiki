@@ -19,6 +19,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      'no-useless-escape': 'off',
     },
   },
   prettier,
