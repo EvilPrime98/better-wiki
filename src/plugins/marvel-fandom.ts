@@ -1,4 +1,5 @@
 import type { Wiki, WikiPage, WikiFlags } from '../types';
+import { resolveCoverFromContent } from '../utils';
 import Fuse from 'fuse.js';
 
 /** A single character/entity reference within a {@link WikiAppearingSection}. */
@@ -455,7 +456,11 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
 
   //BUILDERS
 
-  const wikiComicBuilder = (page: WikiPage | undefined, content: WikiStrContent): WikiComic => {
+  const wikiComicBuilder = (
+    page: WikiPage | undefined,
+    content: WikiStrContent,
+    resolvedCover?: string,
+  ): WikiComic => {
     const { day, month, year } = parseReleaseDate(content['ReleaseDate']);
     const speaker = extractSpeaker(content['Speaker']);
     const { volume: fallbackVolume, issue: fallbackIssue } = parseVolumeIssueFromTitle(page?.title);
@@ -463,7 +468,7 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
       title: page?.title || '',
       volume: content['Volume'] || fallbackVolume,
       issue: content['Issue'] || fallbackIssue,
-      cover: page?.thumbnail || '',
+      cover: resolvedCover || page?.thumbnail || '',
       pageId: page?.id || -1,
       releaseDate: {
         releaseDay: day,
@@ -651,7 +656,17 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
 
     if (flags.multiple === true) {
       if (pages.length === 0) return [];
-      const comics = candidates.map((c) => wikiComicBuilder(c.page, c.content));
+      const comics = await Promise.all(
+        candidates.map(async (c) => {
+          const cover = await resolveCoverFromContent(
+            wikiClient,
+            c.content,
+            'Image1',
+            flags.thumbnailSize,
+          );
+          return wikiComicBuilder(c.page, c.content, cover);
+        }),
+      );
       return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
     }
 
@@ -660,7 +675,14 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
     const queryYear = extractYear(query);
     const best = selectBest(candidates, nQuery, queryYear);
     if (!best) return null;
-    return wikiComicBuilder(best.page, best.content ?? ({} as WikiStrContent));
+    const bestContent = best.content ?? ({} as WikiStrContent);
+    const bestCover = await resolveCoverFromContent(
+      wikiClient,
+      bestContent,
+      'Image1',
+      flags.thumbnailSize,
+    );
+    return wikiComicBuilder(best.page, bestContent, bestCover);
   }
 
   /**
@@ -684,7 +706,14 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
     const thumbFlags = flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {};
 
     const toComic = async (page: WikiPage): Promise<WikiComic> => {
-      return wikiComicBuilder(page, (await page.getStructuredContent()) as WikiStrContent);
+      const content = (await page.getStructuredContent()) as WikiStrContent;
+      const cover = await resolveCoverFromContent(
+        wikiClient,
+        content,
+        'Image1',
+        flags.thumbnailSize,
+      );
+      return wikiComicBuilder(page, content, cover);
     };
 
     if (Array.isArray(pageId)) {

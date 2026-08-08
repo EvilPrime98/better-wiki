@@ -1,3 +1,27 @@
+import type { Wiki } from './types';
+
+/**
+ * Resolves a cover image URL from an infobox content map by filename field (e.g. `Image`,
+ * `Image1`), falling back to `undefined` — letting the caller fall back to `page.thumbnail` —
+ * when the field is absent or the file can't be resolved.
+ *
+ * @param wikiClient - The base client used to resolve the filename to a URL.
+ * @param content - The page's structured infobox content.
+ * @param fieldName - The infobox key holding the cover filename (plugin-specific).
+ * @param width - Optional width to scale the resolved URL to.
+ */
+export const resolveCoverFromContent = async (
+  wikiClient: Wiki,
+  content: Record<string, string>,
+  fieldName: string,
+  width?: number,
+): Promise<string | undefined> => {
+  const fileName = content[fieldName];
+  if (!fileName) return undefined;
+  const url = await wikiClient.getFileUrl(fileName, width);
+  return url || undefined;
+};
+
 /**
  * Splits an array into consecutive chunks of at most `chunkSize` elements.
  * The last chunk may be smaller if `arr.length` isn't a multiple of `chunkSize`.

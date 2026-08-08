@@ -91,6 +91,7 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 | `searchCategories(query)`                      | `string[]`                                                |
 | `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                                    |
 | `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px |
+| `getFileUrl(fileName, width?)`                 | `string` — resolves a wiki filename (e.g. `Image1.jpg`, no `File:` prefix) to its URL, optionally scaled to `width` px |
 | `clearCache()`                                 | `void`                                                    |
 
 Pass `flags` to any page-fetching method to filter or augment results:

@@ -851,6 +851,12 @@ export function wiki(
     return result;
   }
 
+  const getFileUrl = async (fileName: string, width?: number): Promise<string> => {
+    if (!fileName) return '';
+    const urlMap = await getFileUrls([fileName]);
+    return scaleUrl(urlMap.get(fileName) ?? '', width);
+  };
+
   const base: Wiki = {
     getPage,
     getPageById,
@@ -861,6 +867,7 @@ export function wiki(
     searchCategories,
     getCategoriesFromPage,
     getThumbnailById: getThumbnail,
+    getFileUrl,
     clearCache: () => apiCache.clear(),
   };
 

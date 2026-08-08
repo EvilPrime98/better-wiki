@@ -1,4 +1,5 @@
 import type { Wiki, WikiPage, WikiFlags } from '../types';
+import { resolveCoverFromContent } from '../utils';
 import Fuse from 'fuse.js';
 
 /** A single character/entity reference within a {@link WikiAppearingSection}. */
@@ -445,12 +446,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     page: WikiPage | undefined,
     content: WikiStrContent,
     fields?: (keyof WikiComic)[],
+    resolvedCover?: string,
   ): WikiComic => {
     const COMIC_FIELD_BUILDERS: { [K in keyof WikiComic]: () => WikiComic[K] } = {
       title: () => page?.title || '',
       volume: () => content['Volume'] || '',
       issue: () => content['Issue'] || '',
-      cover: () => page?.thumbnail || '',
+      cover: () => resolvedCover || page?.thumbnail || '',
       pageId: () => page?.id || -1,
       releaseDate: () => ({
         releaseDay: content['Day'] || '',
@@ -670,7 +672,17 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
     if (flags.multiple === true) {
       if (pages.length === 0) return [];
-      const comics = candidates.map((c) => wikiComicBuilder(c.page, c.content, flags.fields));
+      const comics = await Promise.all(
+        candidates.map(async (c) => {
+          const cover = await resolveCoverFromContent(
+            wikiClient,
+            c.content,
+            'Image',
+            flags.thumbnailSize,
+          );
+          return wikiComicBuilder(c.page, c.content, flags.fields, cover);
+        }),
+      );
       return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
     }
 
@@ -679,7 +691,14 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     const queryYear = extractYear(query);
     const best = selectBest(candidates, nQuery, queryYear);
     if (!best) return null;
-    return wikiComicBuilder(best.page, best.content ?? ({} as WikiStrContent), flags.fields);
+    const bestContent = best.content ?? ({} as WikiStrContent);
+    const bestCover = await resolveCoverFromContent(
+      wikiClient,
+      bestContent,
+      'Image',
+      flags.thumbnailSize,
+    );
+    return wikiComicBuilder(best.page, bestContent, flags.fields, bestCover);
   }
 
   /**
@@ -703,11 +722,14 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     const thumbFlags = flags.thumbnailSize ? { thumbnailSize: flags.thumbnailSize } : {};
 
     const toComic = async (page: WikiPage): Promise<WikiComic> => {
-      return wikiComicBuilder(
-        page,
-        (await page.getStructuredContent()) as WikiStrContent,
-        flags.fields,
+      const content = (await page.getStructuredContent()) as WikiStrContent;
+      const cover = await resolveCoverFromContent(
+        wikiClient,
+        content,
+        'Image',
+        flags.thumbnailSize,
       );
+      return wikiComicBuilder(page, content, flags.fields, cover);
     };
 
     if (Array.isArray(pageId)) {
