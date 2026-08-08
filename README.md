@@ -211,6 +211,19 @@ Pass `flags.thumbnailSize` (number, px) to scale cover thumbnail URLs.
 
 All returned types (`WikiComic`, `WikiVolume`, `WikiCredits`, `WikiAppearingSection`, etc.) are exported from the package root for use in your own type annotations.
 
+### `marvel-fandom` plugin
+
+Targets `https://marvel.fandom.com`. Mirrors the `dc-fandom` plugin's method surface (`getComic`, `getComicById`, `getVolume`, `getVolumeById`, `getCharacter`, `getCharacterById`, `getCharacterAppearances`) and flags, adapted to Marvel Fandom's infobox conventions:
+
+- `ReleaseDate` is a single combined field (e.g. `"June 6, 2018"`), parsed into `releaseDate.releaseDay/releaseMonth/releaseYear` instead of separate `Day`/`Month`/`Year` fields.
+- `event` is read from `Event1` rather than `Event`.
+- When a comic's infobox has no standalone `Volume`/`Issue` fields, they're parsed from the page title instead (e.g. `"Immortal Hulk Vol 1 1"`).
+
+```ts
+const marvel = wiki({ plugin: 'marvel-fandom' });
+const comic = await marvel.getComic('Immortal Hulk #1 (2018)');
+```
+
 ## Development
 
 ```bash

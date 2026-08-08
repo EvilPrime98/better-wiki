@@ -1,5 +1,6 @@
 import type { Wiki } from '../types';
 import { dcFandomPlugin } from './dc-fandom';
+import { marvelFandomPlugin } from './marvel-fandom';
 
 /**
  * Registry of built-in plugins, keyed by plugin name. Each entry provides the wiki's
@@ -9,6 +10,10 @@ export const PLUGINS = {
   'dc-fandom': {
     url: 'https://dc.fandom.com',
     factory: dcFandomPlugin,
+  },
+  'marvel-fandom': {
+    url: 'https://marvel.fandom.com',
+    factory: marvelFandomPlugin,
   },
 } as const satisfies Record<string, { url: string; factory: (client: Wiki) => object }>;
 
