@@ -77,21 +77,22 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 
 ### Client methods
 
-| Method                                         | Returns                                                   |
-| ---------------------------------------------- | --------------------------------------------------------- |
-| `getPage(query, flags?)`                       | `WikiPage[]` — full-text search results                   |
-| `getPageById(pageId, flags?)`                  | `WikiPage \| null`                                        |
-| `getPageById(pageIds[], flags?)`               | `WikiPage[]` — batch lookup by IDs                        |
-| `getPageByTitle(title, flags?)`                | `WikiPage \| null`                                        |
-| `getPagesByCategory(category, flags?)`         | `WikiPage[]`                                              |
-| `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext                      |
-| `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox                 |
-| `getCategoryMembers(categoryTitle)`            | `WikiCategoryMemberItem[]`                                |
-| `getCategoryMembers(titles[])`                 | `WikiCategoryMemberItem[]` — intersection across titles   |
-| `searchCategories(query)`                      | `string[]`                                                |
-| `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                                    |
-| `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px |
-| `clearCache()`                                 | `void`                                                    |
+| Method                                         | Returns                                                                                                                |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `getPage(query, flags?)`                       | `WikiPage[]` — full-text search results                                                                                |
+| `getPageById(pageId, flags?)`                  | `WikiPage \| null`                                                                                                     |
+| `getPageById(pageIds[], flags?)`               | `WikiPage[]` — batch lookup by IDs                                                                                     |
+| `getPageByTitle(title, flags?)`                | `WikiPage \| null`                                                                                                     |
+| `getPagesByCategory(category, flags?)`         | `WikiPage[]`                                                                                                           |
+| `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext                                                                                   |
+| `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox                                                                              |
+| `getCategoryMembers(categoryTitle)`            | `WikiCategoryMemberItem[]`                                                                                             |
+| `getCategoryMembers(titles[])`                 | `WikiCategoryMemberItem[]` — intersection across titles                                                                |
+| `searchCategories(query)`                      | `string[]`                                                                                                             |
+| `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                                                                                                 |
+| `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px                                                              |
+| `getFileUrl(fileName, width?)`                 | `string` — resolves a wiki filename (e.g. `Image1.jpg`, no `File:` prefix) to its URL, optionally scaled to `width` px |
+| `clearCache()`                                 | `void`                                                                                                                 |
 
 Pass `flags` to any page-fetching method to filter or augment results:
 

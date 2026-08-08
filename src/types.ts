@@ -537,6 +537,8 @@ export interface Wiki {
   ) => Promise<WikiPage[]>;
   /** Fetches a page's thumbnail URL, optionally scaled to `width`. */
   getThumbnailById: (pageId: number, width?: number) => Promise<string>;
+  /** Resolves a wiki filename (e.g. `Image1.jpg`, without the `File:` prefix) to its URL, optionally scaled to `width`. */
+  getFileUrl: (fileName: string, width?: number) => Promise<string>;
   /** Fetches a page's content by ID, as raw wikitext or a structured key/value map. */
   getPageContent: {
     (

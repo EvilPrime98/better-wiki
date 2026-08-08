@@ -30,6 +30,7 @@ const pageByIdResponse = (
   pageid: number,
   title: string,
   categories: { ns: number; title: string }[] = [],
+  thumbnail?: string,
 ) =>
   jsonResponse({
     query: {
@@ -40,10 +41,14 @@ const pageByIdResponse = (
           title,
           index: 0,
           categories,
+          ...(thumbnail ? { thumbnail: { source: thumbnail } } : {}),
         },
       },
     },
   });
+
+const BASE_THUMBNAIL =
+  'https://static.wikia.nocookie.net/marvel/images/hulk.jpg/revision/latest/scale-to-width-down/400/hulk.jpg';
 
 beforeEach(() => {
   fetchMock = vi.fn();
@@ -97,6 +102,45 @@ describe('marvel-fandom plugin', () => {
     expect(comic!.event).toBe('Infinity Countdown');
     expect(comic!.credits.writers).toContain('Al Ewing');
     expect(comic!.sourceWiki).toBe('https://marvel.fandom.com');
+  });
+
+  it('getComicById resolves cover from the infobox Image1 field, not the auto-picked page thumbnail', async () => {
+    const wikitext = '{{ComicInfobox\n| Image1 = Immortal Hulk Vol 1 1.jpg\n}}';
+    const coverUrl =
+      'https://static.wikia.nocookie.net/marvel/images/i/i1/Immortal_Hulk_Vol_1_1.jpg/revision/latest';
+    fetchMock
+      .mockResolvedValueOnce(
+        // page.thumbnail here is a non-cover image MediaWiki auto-picked (e.g. a gallery video thumbnail)
+        pageByIdResponse(104, 'Immortal Hulk Vol 1 1', [], BASE_THUMBNAIL),
+      )
+      .mockResolvedValueOnce(comicWikitextResponse(104, 'Immortal Hulk Vol 1 1', wikitext))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '500': {
+                pageid: 500,
+                ns: 6,
+                title: 'File:Immortal Hulk Vol 1 1.jpg',
+                imageinfo: [{ url: coverUrl }],
+              },
+            },
+          },
+        }),
+      );
+
+    const comic = await wiki({ plugin: 'marvel-fandom' }).getComicById(104);
+    expect(comic!.cover).toBe(coverUrl);
+  });
+
+  it('getComicById falls back to page.thumbnail when the infobox has no Image1 field', async () => {
+    const wikitext = '{{ComicInfobox\n| Volume = 1\n}}';
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(105, 'Immortal Hulk Vol 1 1', [], BASE_THUMBNAIL))
+      .mockResolvedValueOnce(comicWikitextResponse(105, 'Immortal Hulk Vol 1 1', wikitext));
+
+    const comic = await wiki({ plugin: 'marvel-fandom' }).getComicById(105);
+    expect(comic!.cover).toBe(BASE_THUMBNAIL.replace('/scale-to-width-down/400', ''));
   });
 
   it('falls back to parsing volume/issue from the page title when infobox fields are absent', async () => {

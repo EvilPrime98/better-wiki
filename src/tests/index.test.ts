@@ -706,6 +706,45 @@ describe('wiki plugin system', () => {
     expect(comic!.sourceWiki).toBe('https://some-other.fandom.com');
   });
 
+  it('getComicById resolves cover from the infobox Image field, not the auto-picked page thumbnail', async () => {
+    const wikitext = '{{ComicInfobox\n| Image = Batman Vol 1 7.jpg\n| Volume = 1\n| Issue = 7\n}}';
+    const coverUrl =
+      'https://static.wikia.nocookie.net/dc/images/b/b1/Batman_Vol_1_7.jpg/revision/latest';
+    fetchMock
+      .mockResolvedValueOnce(
+        // page.thumbnail here is a non-cover image MediaWiki auto-picked (e.g. a gallery video thumbnail)
+        pageByIdResponse(42, 'Batman Vol 1 7', [], BASE_THUMBNAIL),
+      )
+      .mockResolvedValueOnce(comicWikitextResponse(42, 'Batman Vol 1 7', wikitext))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '500': {
+                pageid: 500,
+                ns: 6,
+                title: 'File:Batman Vol 1 7.jpg',
+                imageinfo: [{ url: coverUrl }],
+              },
+            },
+          },
+        }),
+      );
+
+    const comic = await wiki({ plugin: 'dc-fandom' }).getComicById(42);
+    expect(comic!.cover).toBe(coverUrl);
+  });
+
+  it('getComicById falls back to page.thumbnail when the infobox has no Image field', async () => {
+    const wikitext = '{{ComicInfobox\n| Volume = 1\n| Issue = 7\n}}';
+    fetchMock
+      .mockResolvedValueOnce(pageByIdResponse(42, 'Batman Vol 1 7', [], BASE_THUMBNAIL))
+      .mockResolvedValueOnce(comicWikitextResponse(42, 'Batman Vol 1 7', wikitext));
+
+    const comic = await wiki({ plugin: 'dc-fandom' }).getComicById(42);
+    expect(comic!.cover).toBe(BASE_THUMBNAIL.replace('/scale-to-width-down/400', ''));
+  });
+
   it('getComic with multiple:true returns empty array when no pages found', async () => {
     // getPage internal calls: generator search → returns empty
     fetchMock.mockResolvedValueOnce(
