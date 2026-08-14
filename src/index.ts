@@ -1,6 +1,6 @@
 export { wiki, VERSION } from './better-wiki';
 export * from './types';
-export type { PluginName, PluginReturn } from './plugins/index';
+export type { PluginName, PluginReturn, WikiPlugin } from './plugins/index';
 export type {
   WikiAppearanceEntry,
   WikiAppearingSection,
