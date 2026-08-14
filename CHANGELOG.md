@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.19.0
+
+### Minor Changes
+
+- 6f37e73: Export `WikiPlugin`, a type representing a wiki client extended by any registered plugin. Lets consumers type collections of plugin clients (e.g. `Map<string, WikiPlugin>`) without instantiating a client solely for type inference.
+
 ## 0.18.0
 
 ### Minor Changes
