@@ -22,3 +22,6 @@ export type PluginName = keyof typeof PLUGINS;
 
 /** The additional methods a plugin `K` adds to the base {@link Wiki} client. */
 export type PluginReturn<K extends PluginName> = ReturnType<(typeof PLUGINS)[K]['factory']>;
+
+/** A wiki client extended by any registered plugin — the return type of `wiki({ plugin: ... })` for some plugin. */
+export type WikiPlugin = { [K in PluginName]: Wiki & PluginReturn<K> }[PluginName];

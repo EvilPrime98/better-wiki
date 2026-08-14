@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VERSION, wiki } from '../better-wiki.js';
 import { isGeneratorPageItem } from '../predicates.types.js';
+import type { WikiPlugin } from '../index.js';
 
 const comicWikitextResponse = (pageid: number, title: string, wikitext: string) =>
   jsonResponse({
@@ -1782,5 +1783,12 @@ describe('getPage', () => {
     });
     expect(pages).toHaveLength(2);
     expect(pages.map((p) => p.title)).toEqual(['Batman', 'Joker']);
+  });
+
+  it('accepts any plugin client under the exported WikiPlugin type', () => {
+    const clients = new Map<string, WikiPlugin>();
+    clients.set('https://dc.fandom.com', wiki({ plugin: 'dc-fandom' }));
+    clients.set('https://marvel.fandom.com', wiki({ plugin: 'marvel-fandom' }));
+    expect(clients.size).toBe(2);
   });
 });
