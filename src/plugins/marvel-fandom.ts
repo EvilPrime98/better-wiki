@@ -624,6 +624,12 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
   ): Promise<WikiComic[]>;
   async function getComic(
     query: string,
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+      multiple?: boolean;
+    },
+  ): Promise<WikiComic | WikiComic[] | null>;
+  async function getComic(
+    query: string,
     flags: Pick<
       WikiFlags,
       'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'multiple'
@@ -744,6 +750,10 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
   ): Promise<WikiVolume[]>;
   async function getVolume(
     query: string,
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & { multiple?: boolean },
+  ): Promise<WikiVolume | WikiVolume[] | null>;
+  async function getVolume(
+    query: string,
     flags: Pick<WikiFlags, 'thumbnailSize' | 'multiple'> = {},
   ): Promise<WikiVolume | null | WikiVolume[]> {
     const nQuery = preNormalization(query);
@@ -840,6 +850,10 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
     query: string,
     flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple: true },
   ): Promise<WikiCharacter[]>;
+  async function getCharacter(
+    query: string,
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple?: boolean },
+  ): Promise<WikiCharacter | WikiCharacter[] | null>;
   async function getCharacter(
     query: string,
     flags: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'multiple'> = {},

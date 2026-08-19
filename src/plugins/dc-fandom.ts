@@ -640,6 +640,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
   ): Promise<WikiComic[]>;
   async function getComic(
     query: string,
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+      multiple?: boolean;
+      fields?: (keyof WikiComic)[];
+    },
+  ): Promise<WikiComic | WikiComic[] | null>;
+  async function getComic(
+    query: string,
     flags: Pick<
       WikiFlags,
       'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'multiple'
@@ -763,6 +770,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
   ): Promise<WikiVolume[]>;
   async function getVolume(
     query: string,
+    flags?: Pick<WikiFlags, 'thumbnailSize'> & {
+      multiple?: boolean;
+      fields?: (keyof WikiVolume)[];
+    },
+  ): Promise<WikiVolume | WikiVolume[] | null>;
+  async function getVolume(
+    query: string,
     flags: Pick<WikiFlags, 'thumbnailSize' | 'multiple'> & {
       fields?: (keyof WikiVolume)[];
     } = {},
@@ -869,6 +883,13 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       fields?: (keyof WikiCharacter)[];
     },
   ): Promise<WikiCharacter[]>;
+  async function getCharacter(
+    query: string,
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & {
+      multiple?: boolean;
+      fields?: (keyof WikiCharacter)[];
+    },
+  ): Promise<WikiCharacter | WikiCharacter[] | null>;
   async function getCharacter(
     query: string,
     flags: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'multiple'> & {
