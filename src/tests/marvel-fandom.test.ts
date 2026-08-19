@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, expectTypeOf, vi, beforeEach, afterEach } from 'vitest';
 import { wiki } from '../better-wiki.js';
 
 type FetchStub = ReturnType<typeof vi.fn>;
@@ -224,5 +224,16 @@ describe('marvel-fandom plugin', () => {
       speaker: 'Bruce Banner',
     });
     expect(character!.sourceWiki).toBe('https://marvel.fandom.com');
+  });
+});
+
+describe('getComic/getVolume/getCharacter — `multiple` flag typing (issue #38)', () => {
+  it('accepts a non-literal boolean for `multiple`, not just the literal true/false', () => {
+    const client = wiki({ plugin: 'marvel-fandom' });
+    const multiple: boolean = true;
+
+    expectTypeOf(client.getComic).toBeCallableWith('title', { multiple });
+    expectTypeOf(client.getVolume).toBeCallableWith('title', { multiple });
+    expectTypeOf(client.getCharacter).toBeCallableWith('title', { multiple });
   });
 });

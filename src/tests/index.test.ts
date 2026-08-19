@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, expectTypeOf, vi, beforeEach, afterEach } from 'vitest';
 import { VERSION, wiki } from '../better-wiki.js';
 import { isGeneratorPageItem } from '../predicates.types.js';
 import type { WikiPlugin } from '../index.js';
@@ -1790,5 +1790,16 @@ describe('getPage', () => {
     clients.set('https://dc.fandom.com', wiki({ plugin: 'dc-fandom' }));
     clients.set('https://marvel.fandom.com', wiki({ plugin: 'marvel-fandom' }));
     expect(clients.size).toBe(2);
+  });
+});
+
+describe('getComic/getVolume/getCharacter — `multiple` flag typing (issue #38)', () => {
+  it('accepts a non-literal boolean for `multiple`, not just the literal true/false', () => {
+    const client = wiki({ plugin: 'dc-fandom' });
+    const multiple: boolean = true;
+
+    expectTypeOf(client.getComic).toBeCallableWith('title', { multiple });
+    expectTypeOf(client.getVolume).toBeCallableWith('title', { multiple });
+    expectTypeOf(client.getCharacter).toBeCallableWith('title', { multiple });
   });
 });
