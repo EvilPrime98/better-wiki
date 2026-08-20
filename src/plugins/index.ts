@@ -1,6 +1,6 @@
-import type { Wiki } from '../types';
-import { dcFandomPlugin } from './dc-fandom';
-import { marvelFandomPlugin } from './marvel-fandom';
+import type { Wiki } from '../types.js';
+import { dcFandomPlugin } from './dc-fandom.js';
+import { marvelFandomPlugin } from './marvel-fandom.js';
 
 /**
  * Registry of built-in plugins, keyed by plugin name. Each entry provides the wiki's

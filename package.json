@@ -35,6 +35,7 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
+    "check:esm": "node -e \"import('./dist/index.js').then(m => { if (!m.wiki) throw new Error('missing export'); })\"",
     "prepublishOnly": "pnpm run build && pnpm run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",

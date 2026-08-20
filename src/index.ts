@@ -1,6 +1,6 @@
-export { wiki, VERSION } from './better-wiki';
-export * from './types';
-export type { PluginName, PluginReturn, WikiPlugin } from './plugins/index';
+export { wiki, VERSION } from './better-wiki.js';
+export * from './types.js';
+export type { PluginName, PluginReturn, WikiPlugin } from './plugins/index.js';
 export type {
   WikiAppearanceEntry,
   WikiAppearingSection,
@@ -12,4 +12,4 @@ export type {
   WikiVolume,
   WikiCharacterHistorySection,
   WikiCharacter,
-} from './plugins/dc-fandom';
+} from './plugins/dc-fandom.js';

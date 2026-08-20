@@ -1,5 +1,5 @@
-import type { Wiki, WikiPage, WikiFlags } from '../types';
-import { resolveCoverFromContent, resolveMultipleLimit } from '../utils';
+import type { Wiki, WikiPage, WikiFlags } from '../types.js';
+import { resolveCoverFromContent, resolveMultipleLimit } from '../utils.js';
 import Fuse from 'fuse.js';
 
 /** A single character/entity reference within a {@link WikiAppearingSection}. */

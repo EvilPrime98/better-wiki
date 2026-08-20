@@ -1,4 +1,4 @@
-import type { Wiki } from './types';
+import type { Wiki } from './types.js';
 
 /**
  * Resolves the `limit` flag to forward to {@link Wiki.getPage} for `multiple`-capable plugin

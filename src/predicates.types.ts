@@ -1,4 +1,4 @@
-import type { WikiSearchGeneratorPageItem } from './types';
+import type { WikiSearchGeneratorPageItem } from './types.js';
 
 /**
  * Type guard for a MediaWiki generator-query result page that resolved successfully

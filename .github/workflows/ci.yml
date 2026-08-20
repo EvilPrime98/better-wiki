@@ -35,5 +35,8 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check ESM import on Node
+        run: pnpm check:esm
+
       - name: Test
         run: pnpm test
