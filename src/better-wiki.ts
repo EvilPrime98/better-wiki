@@ -264,17 +264,27 @@ export function wiki(
 
   const getImages = (page: WikiSearchGeneratorPageItem) => {
     return async (width?: number) => {
-      const url = buildApiUrl({
+      let urlParams: Record<string, string> = {
         action: 'query',
         generator: 'images',
         pageids: page.pageid.toString(),
         prop: 'imageinfo',
         iiprop: 'url',
         gimlimit: 'max',
-      });
+      };
 
-      const data = await getCachedOrFetch<WikiQueryImagesResponse>(url);
-      const pages = data.query.pages;
+      let data = await getCachedOrFetch<WikiQueryImagesResponse>(buildApiUrl(urlParams));
+      const pages = { ...data.query.pages };
+
+      while (data.continue !== undefined) {
+        urlParams = {
+          ...urlParams,
+          gimcontinue: data.continue.gimcontinue,
+          continue: data.continue.continue,
+        };
+        data = await getCachedOrFetch<WikiQueryImagesResponse>(buildApiUrl(urlParams));
+        Object.assign(pages, data.query.pages);
+      }
 
       return Object.keys(pages)
         .map((id) => {
@@ -288,20 +298,36 @@ export function wiki(
 
   const getGallery = (page: WikiSearchGeneratorPageItem) => {
     return async (width?: number) => {
-      const galleryUrl = buildApiUrl({
+      let galleryUrlParams: Record<string, string> = {
         action: 'query',
         titles: `${page.title}/Gallery`,
         prop: 'images',
         imlimit: 'max',
-      });
+      };
 
-      const galleryData = await getCachedOrFetch<WikiQueryGalleryResponse>(galleryUrl);
+      let galleryData = await getCachedOrFetch<WikiQueryGalleryResponse>(
+        buildApiUrl(galleryUrlParams),
+      );
 
-      const pages = galleryData.query?.pages ?? {};
-
-      const fileTitles = Object.values(pages).flatMap(
+      const fileTitles = Object.values(galleryData.query?.pages ?? {}).flatMap(
         (p) => p?.images?.map((img) => img.title) ?? [],
       );
+
+      while (galleryData.continue !== undefined) {
+        galleryUrlParams = {
+          ...galleryUrlParams,
+          imcontinue: galleryData.continue.imcontinue,
+          continue: galleryData.continue.continue,
+        };
+        galleryData = await getCachedOrFetch<WikiQueryGalleryResponse>(
+          buildApiUrl(galleryUrlParams),
+        );
+        fileTitles.push(
+          ...Object.values(galleryData.query?.pages ?? {}).flatMap(
+            (p) => p?.images?.map((img) => img.title) ?? [],
+          ),
+        );
+      }
 
       if (fileTitles.length === 0) return [];
 
@@ -627,7 +653,7 @@ export function wiki(
     title: string,
     flags: Pick<WikiFlags, 'category' | 'thumbnailSize'> = {},
   ): Promise<WikiPage | null> {
-    const url = buildApiUrl({
+    let urlParams: Record<string, string> = {
       action: 'query',
       titles: title,
       prop: 'info|categories|pageimages',
@@ -635,12 +661,26 @@ export function wiki(
       cllimit: 'max',
       piprop: 'thumbnail',
       pithumbsize: '400',
-    });
+    };
 
-    const data = await getCachedOrFetch<WikiSearchGeneratorResponse>(url);
+    let data = await getCachedOrFetch<WikiSearchGeneratorResponse>(buildApiUrl(urlParams));
 
     const page = Object.values(data.query.pages)[0];
     if (!page || page.pageid < 0) return null;
+
+    const categories = [...(page.categories ?? [])];
+
+    while (data.continue !== undefined) {
+      urlParams = {
+        ...urlParams,
+        clcontinue: data.continue.clcontinue,
+        continue: data.continue.continue,
+      };
+      data = await getCachedOrFetch<WikiSearchGeneratorResponse>(buildApiUrl(urlParams));
+      categories.push(...(Object.values(data.query.pages)[0]?.categories ?? []));
+    }
+
+    page.categories = categories;
 
     const targetCategories = flags.category;
     if (targetCategories?.length) {
@@ -776,18 +816,29 @@ export function wiki(
   }
 
   async function searchCategories(query: string): Promise<string[]> {
-    const url = buildApiUrl({
+    let urlParams: Record<string, string> = {
       action: 'query',
       list: 'search',
       srsearch: query,
       srnamespace: '14',
       srlimit: '500',
       srwhat: 'text',
-    });
+    };
 
-    const data = await getCachedOrFetch<WikiSearchResponse>(url);
+    let data = await getCachedOrFetch<WikiSearchResponse>(buildApiUrl(urlParams));
+    const results = [...data.query.search];
 
-    return data.query.search.map((match) => match.title);
+    while (data.continue !== undefined) {
+      urlParams = {
+        ...urlParams,
+        sroffset: data.continue.sroffset.toString(),
+        continue: data.continue.continue,
+      };
+      data = await getCachedOrFetch<WikiSearchResponse>(buildApiUrl(urlParams));
+      results.push(...data.query.search);
+    }
+
+    return results.map((match) => match.title);
   }
 
   async function getCategoriesFromPage(pageId: number): Promise<WikiPageCategory[]> {

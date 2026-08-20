@@ -65,6 +65,7 @@ export interface WikiAllPagesResponse {
 }
 
 export interface WikiSearchResponse {
+  continue?: { sroffset: number; continue: string };
   query: {
     search: {
       ns: number;
@@ -410,6 +411,7 @@ export interface WikiPage {
 
 export interface WikiQueryImagesResponse {
   batchcomplete: string;
+  continue?: { gimcontinue: string; continue: string };
   limits: { images: number };
   query: {
     pages: Record<
@@ -431,6 +433,7 @@ export interface WikiQueryImagesResponse {
 
 export interface WikiQueryGalleryResponse {
   batchcomplete: string;
+  continue?: { imcontinue: string; continue: string };
   limits: { images: number };
   query: {
     pages: Record<
