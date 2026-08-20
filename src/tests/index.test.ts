@@ -287,6 +287,27 @@ describe('searchCategories', () => {
     const result = await wiki('https://dc.fandom.com').searchCategories('characters');
     expect(result).toEqual(['Category:Characters', 'Category:Villains']);
   });
+
+  it('follows sroffset continue tokens and merges results from all pages', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          continue: { sroffset: 500, continue: 'gsroffset||' },
+          query: { search: [{ title: 'Category:Characters', pageid: 1 }] },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: { search: [{ title: 'Category:Villains', pageid: 2 }] },
+        }),
+      );
+
+    const result = await wiki('https://dc.fandom.com').searchCategories('characters');
+    expect(result).toEqual(['Category:Characters', 'Category:Villains']);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const continuationUrl = new URL(fetchMock.mock.calls[1]![0] as string);
+    expect(continuationUrl.searchParams.get('sroffset')).toBe('500');
+  });
 });
 
 describe('getCategoryMembers', () => {
@@ -349,6 +370,132 @@ describe('getPagesByCategory', () => {
     const [page] = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X');
     expect(typeof page!.getImages).toBe('function');
     expect(typeof page!.getGallery).toBe('function');
+  });
+
+  it('getImages follows gimcontinue tokens and merges images from all pages', async () => {
+    fetchMock
+      .mockResolvedValueOnce(membersResponse([{ pageid: 1, ns: 0, title: 'Batman' }]))
+      .mockResolvedValueOnce(pageInfoResponse({ '1': { pageid: 1, canonicalurl: '' } }))
+      .mockResolvedValueOnce(categoriesFromPageResponse(1, 'Batman'))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          continue: { gimcontinue: '100', continue: '||' },
+          limits: { images: 10 },
+          query: {
+            pages: {
+              '10': {
+                pageId: 10,
+                ns: 6,
+                title: 'File:A.jpg',
+                imagerepository: 'local',
+                imageinfo: [
+                  { url: 'https://example.com/a.jpg', descriptionurl: '', descriptionshorturl: '' },
+                ],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          limits: { images: 10 },
+          query: {
+            pages: {
+              '11': {
+                pageId: 11,
+                ns: 6,
+                title: 'File:B.jpg',
+                imagerepository: 'local',
+                imageinfo: [
+                  { url: 'https://example.com/b.jpg', descriptionurl: '', descriptionshorturl: '' },
+                ],
+              },
+            },
+          },
+        }),
+      );
+
+    const [page] = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X');
+    const images = await page!.getImages();
+    expect(images).toEqual(['https://example.com/a.jpg', 'https://example.com/b.jpg']);
+    const continuationUrl = new URL(fetchMock.mock.calls[4]![0] as string);
+    expect(continuationUrl.searchParams.get('gimcontinue')).toBe('100');
+  });
+
+  it('getGallery follows imcontinue tokens and merges the gallery listing from all pages', async () => {
+    fetchMock
+      .mockResolvedValueOnce(membersResponse([{ pageid: 1, ns: 0, title: 'Batman' }]))
+      .mockResolvedValueOnce(pageInfoResponse({ '1': { pageid: 1, canonicalurl: '' } }))
+      .mockResolvedValueOnce(categoriesFromPageResponse(1, 'Batman'))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          continue: { imcontinue: '200', continue: '||' },
+          limits: { images: 10 },
+          query: {
+            pages: {
+              '1': {
+                pageId: 1,
+                ns: 0,
+                title: 'Batman/Gallery',
+                images: [{ ns: 6, title: 'File:A.jpg' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          limits: { images: 10 },
+          query: {
+            pages: {
+              '1': {
+                pageId: 1,
+                ns: 0,
+                title: 'Batman/Gallery',
+                images: [{ ns: 6, title: 'File:B.jpg' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          limits: { images: 10 },
+          query: {
+            pages: {
+              '10': {
+                pageId: 10,
+                ns: 6,
+                title: 'File:A.jpg',
+                imagerepository: 'local',
+                imageinfo: [
+                  { url: 'https://example.com/a.jpg', descriptionurl: '', descriptionshorturl: '' },
+                ],
+              },
+              '11': {
+                pageId: 11,
+                ns: 6,
+                title: 'File:B.jpg',
+                imagerepository: 'local',
+                imageinfo: [
+                  { url: 'https://example.com/b.jpg', descriptionurl: '', descriptionshorturl: '' },
+                ],
+              },
+            },
+          },
+        }),
+      );
+
+    const [page] = await wiki('https://dc.fandom.com').getPagesByCategory('Category:X');
+    const gallery = await page!.getGallery();
+    expect(gallery.sort()).toEqual(['https://example.com/a.jpg', 'https://example.com/b.jpg']);
+    const continuationUrl = new URL(fetchMock.mock.calls[4]![0] as string);
+    expect(continuationUrl.searchParams.get('imcontinue')).toBe('200');
   });
 
   it('sends one batch info|pageimages request and separate getCategoriesFromPage calls per member', async () => {
@@ -554,6 +701,47 @@ describe('getPageByTitle', () => {
     expect(page!.thumbnail).toBe(
       BASE_THUMBNAIL.replace('scale-to-width-down/400', 'scale-to-width-down/200'),
     );
+  });
+
+  it('follows clcontinue tokens and merges categories from all pages', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          continue: { clcontinue: '42|next', continue: '||' },
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman',
+                canonicalUrl: 'https://dc.fandom.com/wiki/Batman',
+                categories: [{ ns: 14, title: 'Category:Heroes' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              '42': {
+                pageid: 42,
+                ns: 0,
+                title: 'Batman',
+                canonicalUrl: 'https://dc.fandom.com/wiki/Batman',
+                categories: [{ ns: 14, title: 'Category:Villains' }],
+              },
+            },
+          },
+        }),
+      );
+
+    const page = await wiki('https://dc.fandom.com').getPageByTitle('Batman');
+    expect(page!.categories).toEqual(['Category:Heroes', 'Category:Villains']);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondUrl = new URL(fetchMock.mock.calls[1]![0] as string);
+    expect(secondUrl.searchParams.get('clcontinue')).toBe('42|next');
   });
 });
 
