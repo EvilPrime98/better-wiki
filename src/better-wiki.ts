@@ -1,6 +1,6 @@
 export const VERSION = '0.7.0';
 
-import { isGeneratorPageItem } from './predicates.types';
+import { isGeneratorPageItem } from './predicates.types.js';
 
 import type {
   WikiPageImagesResponse,
@@ -38,10 +38,10 @@ import type {
   CategoriesResponse,
   WikiCategoryMemberItem,
   CategoryMembersResponse,
-} from './types';
+} from './types.js';
 
-import { chunkArray, getInnerText } from './utils';
-import { PLUGINS, type PluginName, type PluginReturn } from './plugins/index';
+import { chunkArray, getInnerText } from './utils.js';
+import { PLUGINS, type PluginName, type PluginReturn } from './plugins/index.js';
 
 export {
   WikiPageImagesResponse,
