@@ -134,8 +134,7 @@ const pageByTitleResponse = (
 
 const searchPageResponse = (
   pages: Record<string, { pageid: number; ns: number; title: string; index: number }>,
-) =>
-  jsonResponse({ batchcomplete: '', continue: { gsroffset: 0, continue: '' }, query: { pages } });
+) => jsonResponse({ batchcomplete: '', query: { pages } });
 
 const thumbnailApiResponse = (pageid: number, thumbnailSource?: string) =>
   jsonResponse({
@@ -751,7 +750,6 @@ describe('wiki plugin system', () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         batchcomplete: '',
-        continue: { gsroffset: 0, continue: '' },
         query: { pages: {} },
       }),
     );
@@ -1203,6 +1201,38 @@ describe('dc-fandom getComic flags', () => {
     });
     expect(result).toHaveLength(1);
     expect(result[0]!.title).toBe('Batman: Year One');
+  });
+});
+
+describe('getComic/getVolume/getCharacter — multiple:true raised limit (issue #41)', () => {
+  it('getComic: multiple:true without an explicit limit requests gsrlimit=50', async () => {
+    fetchMock.mockResolvedValueOnce(searchPageResponse({}));
+    await wiki({ plugin: 'dc-fandom' }).getComic('superman', { multiple: true });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('50');
+  });
+
+  it('getComic: an explicit limit overrides the multiple:true default', async () => {
+    fetchMock.mockResolvedValueOnce(searchPageResponse({}));
+    await wiki({ plugin: 'dc-fandom' }).getComic('superman', { multiple: true, limit: 120 });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('120');
+  });
+
+  it('getComic: multiple:false (default) does not raise the limit', async () => {
+    fetchMock.mockResolvedValueOnce(searchPageResponse({}));
+    await wiki({ plugin: 'dc-fandom' }).getComic('superman');
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('20');
+  });
+
+  it('getVolume: multiple:true without an explicit limit requests gsrlimit=50', async () => {
+    fetchMock.mockResolvedValueOnce(searchPageResponse({}));
+    await wiki({ plugin: 'dc-fandom' }).getVolume('batman', { multiple: true });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('50');
+  });
+
+  it('getCharacter: multiple:true without an explicit limit requests gsrlimit=50', async () => {
+    fetchMock.mockResolvedValueOnce(searchPageResponse({}));
+    await wiki({ plugin: 'dc-fandom' }).getCharacter('batman', { multiple: true });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('50');
   });
 });
 
