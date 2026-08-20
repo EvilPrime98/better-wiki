@@ -13,6 +13,10 @@ const jsonResponse = (body: unknown, ok = true, status = 200): Response =>
 
 let fetchMock: FetchStub;
 
+const lastUrl = (): string => String(fetchMock.mock.calls.at(-1)![0]);
+
+const emptySearchResponse = () => jsonResponse({ batchcomplete: '', query: { pages: {} } });
+
 const comicWikitextResponse = (pageid: number, title: string, wikitext: string) =>
   jsonResponse({
     query: {
@@ -235,5 +239,37 @@ describe('getComic/getVolume/getCharacter — `multiple` flag typing (issue #38)
     expectTypeOf(client.getComic).toBeCallableWith('title', { multiple });
     expectTypeOf(client.getVolume).toBeCallableWith('title', { multiple });
     expectTypeOf(client.getCharacter).toBeCallableWith('title', { multiple });
+  });
+});
+
+describe('getComic/getVolume/getCharacter — multiple:true raised limit (issue #41)', () => {
+  it('getComic: multiple:true without an explicit limit requests gsrlimit=50', async () => {
+    fetchMock.mockResolvedValueOnce(emptySearchResponse());
+    await wiki({ plugin: 'marvel-fandom' }).getComic('spider-man', { multiple: true });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('50');
+  });
+
+  it('getComic: an explicit limit overrides the multiple:true default', async () => {
+    fetchMock.mockResolvedValueOnce(emptySearchResponse());
+    await wiki({ plugin: 'marvel-fandom' }).getComic('spider-man', { multiple: true, limit: 120 });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('120');
+  });
+
+  it('getComic: multiple:false (default) does not raise the limit', async () => {
+    fetchMock.mockResolvedValueOnce(emptySearchResponse());
+    await wiki({ plugin: 'marvel-fandom' }).getComic('spider-man');
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('20');
+  });
+
+  it('getVolume: multiple:true without an explicit limit requests gsrlimit=50', async () => {
+    fetchMock.mockResolvedValueOnce(emptySearchResponse());
+    await wiki({ plugin: 'marvel-fandom' }).getVolume('spider-man', { multiple: true });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('50');
+  });
+
+  it('getCharacter: multiple:true without an explicit limit requests gsrlimit=50', async () => {
+    fetchMock.mockResolvedValueOnce(emptySearchResponse());
+    await wiki({ plugin: 'marvel-fandom' }).getCharacter('spider-man', { multiple: true });
+    expect(new URL(lastUrl()).searchParams.get('gsrlimit')).toBe('50');
   });
 });

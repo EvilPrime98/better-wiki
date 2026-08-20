@@ -202,12 +202,13 @@ A `WikiComic` likewise carries `sourceWiki` — the base URL of the wiki it was 
 
 `getComic` accepts additional flags:
 
-| Flag                 | Type       | Description                                                                            |
-| -------------------- | ---------- | -------------------------------------------------------------------------------------- |
-| `thumbnailSize`      | `number`   | Scale cover thumbnail URLs to this width (px).                                         |
-| `includeCollections` | `boolean`  | Also match pages in `Category:Collected Editions` (default: comics only).              |
-| `category`           | `string[]` | AND-filter: result must belong to **all** listed categories in addition to the OR set. |
-| `sorted`             | `boolean`  | With `multiple: true`, return comics ordered by release date (oldest first).           |
+| Flag                 | Type       | Description                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `thumbnailSize`      | `number`   | Scale cover thumbnail URLs to this width (px).                                                                                                                                                                                                                                                                                         |
+| `includeCollections` | `boolean`  | Also match pages in `Category:Collected Editions` (default: comics only).                                                                                                                                                                                                                                                              |
+| `category`           | `string[]` | AND-filter: result must belong to **all** listed categories in addition to the OR set.                                                                                                                                                                                                                                                 |
+| `sorted`             | `boolean`  | With `multiple: true`, return comics ordered by release date (oldest first).                                                                                                                                                                                                                                                           |
+| `limit`              | `number`   | Raise the number of raw search results considered before category filtering. With `multiple: true` and no explicit `limit`, defaults to 50 (up from the base 20) — broad/generic queries can otherwise lose real matches to filtering after only 20 raw hits. `getVolume` and `getCharacter` accept the same `limit` flag and default. |
 
 Pass `flags.thumbnailSize` (number, px) to scale cover thumbnail URLs.
 

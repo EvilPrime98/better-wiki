@@ -1,5 +1,5 @@
 import type { Wiki, WikiPage, WikiFlags } from '../types';
-import { resolveCoverFromContent } from '../utils';
+import { resolveCoverFromContent, resolveMultipleLimit } from '../utils';
 import Fuse from 'fuse.js';
 
 /** A single character/entity reference within a {@link WikiAppearingSection}. */
@@ -607,24 +607,36 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
    * Finds the best-matching comic issue for `query`, fuzzy-matched against page titles.
    *
    * @param query - Comic title to search for, e.g. `"Action Comics #1000 (2018)"`.
-   * @param flags - Search flags plus `multiple` to return all candidates instead of the best match.
+   * @param flags - Search flags plus `multiple` to return all candidates instead of the best
+   * match, and `limit` to raise the number of raw search results considered (defaults to 50 when
+   * `multiple` is `true`, since broad queries can otherwise lose real matches to category
+   * filtering after only 20 raw hits).
    * @returns The best match (or `null`), or all candidates when `flags.multiple` is `true`.
    */
   async function getComic(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+    flags?: Pick<
+      WikiFlags,
+      'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'limit'
+    > & {
       multiple?: false;
     },
   ): Promise<WikiComic | null>;
   async function getComic(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+    flags?: Pick<
+      WikiFlags,
+      'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'limit'
+    > & {
       multiple: true;
     },
   ): Promise<WikiComic[]>;
   async function getComic(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'includeCollections' | 'category' | 'sorted'> & {
+    flags?: Pick<
+      WikiFlags,
+      'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'limit'
+    > & {
       multiple?: boolean;
     },
   ): Promise<WikiComic | WikiComic[] | null>;
@@ -632,7 +644,7 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
     query: string,
     flags: Pick<
       WikiFlags,
-      'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'multiple'
+      'thumbnailSize' | 'includeCollections' | 'category' | 'sorted' | 'multiple' | 'limit'
     > = {},
   ): Promise<WikiComic[] | WikiComic | null> {
     const nQuery = preNormalization(query);
@@ -650,6 +662,7 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
     const pages = await wikiClient.getPage(nQuery, {
       category: categories,
       categoriesOr,
+      ...resolveMultipleLimit(flags),
       ...(flags.thumbnailSize !== undefined ? { thumbnailSize: flags.thumbnailSize } : {}),
     });
 
@@ -737,29 +750,33 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
    * Finds the best-matching comic-book volume for `query`, fuzzy-matched against page titles.
    *
    * @param query - Volume title to search for.
-   * @param flags - Search flags plus `multiple` to return all candidates instead of the best match.
+   * @param flags - Search flags plus `multiple` to return all candidates instead of the best
+   * match, and `limit` to raise the number of raw search results considered (defaults to 50 when
+   * `multiple` is `true`, since broad queries can otherwise lose real matches to category
+   * filtering after only 20 raw hits).
    * @returns The best match (or `null`), or all candidates when `flags.multiple` is `true`.
    */
   async function getVolume(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize'> & { multiple?: false },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'limit'> & { multiple?: false },
   ): Promise<WikiVolume | null>;
   async function getVolume(
     query: string,
-    flags: Pick<WikiFlags, 'thumbnailSize'> & { multiple: true },
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'limit'> & { multiple: true },
   ): Promise<WikiVolume[]>;
   async function getVolume(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize'> & { multiple?: boolean },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'limit'> & { multiple?: boolean },
   ): Promise<WikiVolume | WikiVolume[] | null>;
   async function getVolume(
     query: string,
-    flags: Pick<WikiFlags, 'thumbnailSize' | 'multiple'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'multiple' | 'limit'> = {},
   ): Promise<WikiVolume | null | WikiVolume[]> {
     const nQuery = preNormalization(query);
 
     const pages = await wikiClient.getPage(nQuery, {
       category: ['Category:Volumes'],
+      ...resolveMultipleLimit(flags),
       ...(flags.thumbnailSize !== undefined ? { thumbnailSize: flags.thumbnailSize } : {}),
     });
 
@@ -839,30 +856,34 @@ export function marvelFandomPlugin(wikiClient: Wiki) {
    * Finds the best-matching character for `query`, fuzzy-matched against page titles.
    *
    * @param query - Character name to search for.
-   * @param flags - Search flags plus `multiple` to return all candidates instead of the best match.
+   * @param flags - Search flags plus `multiple` to return all candidates instead of the best
+   * match, and `limit` to raise the number of raw search results considered (defaults to 50 when
+   * `multiple` is `true`, since broad queries can otherwise lose real matches to category
+   * filtering after only 20 raw hits).
    * @returns The best match (or `null`), or all candidates when `flags.multiple` is `true`.
    */
   async function getCharacter(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple?: false },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'limit'> & { multiple?: false },
   ): Promise<WikiCharacter | null>;
   async function getCharacter(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple: true },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'limit'> & { multiple: true },
   ): Promise<WikiCharacter[]>;
   async function getCharacter(
     query: string,
-    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category'> & { multiple?: boolean },
+    flags?: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'limit'> & { multiple?: boolean },
   ): Promise<WikiCharacter | WikiCharacter[] | null>;
   async function getCharacter(
     query: string,
-    flags: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'multiple'> = {},
+    flags: Pick<WikiFlags, 'thumbnailSize' | 'category' | 'multiple' | 'limit'> = {},
   ): Promise<WikiCharacter[] | WikiCharacter | null> {
     const nQuery = preNormalization(query);
 
     const pages = await wikiClient.getPage(nQuery, {
       category: flags.category ?? [],
       categoriesOr: ['Category:Characters'],
+      ...resolveMultipleLimit(flags),
       ...(flags.thumbnailSize !== undefined ? { thumbnailSize: flags.thumbnailSize } : {}),
     });
 

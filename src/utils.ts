@@ -1,6 +1,28 @@
 import type { Wiki } from './types';
 
 /**
+ * Resolves the `limit` flag to forward to {@link Wiki.getPage} for `multiple`-capable plugin
+ * methods (`getComic`, `getVolume`, `getCharacter`, etc). An explicit caller-supplied `limit`
+ * always wins; otherwise, when `multiple` is requested, raises the raw MediaWiki search window
+ * to `defaultMultipleLimit` — the un-raised default (20 raw hits) is applied *before* category
+ * filtering, so broad/generic queries can lose real matches after filtering even though more
+ * exist. Single-best-match calls (`multiple` falsy) are left unraised.
+ *
+ * @param flags - The `limit` and `multiple` values from the caller's flags.
+ * @param defaultMultipleLimit - The raised limit to use when `multiple` is true and no explicit
+ * `limit` was supplied.
+ * @returns `{ limit }` to spread into the {@link Wiki.getPage} call, or `{}` to omit it entirely.
+ */
+export const resolveMultipleLimit = (
+  flags: { limit?: number; multiple?: boolean },
+  defaultMultipleLimit = 50,
+): { limit?: number } => {
+  if (flags.limit !== undefined) return { limit: flags.limit };
+  if (flags.multiple === true) return { limit: defaultMultipleLimit };
+  return {};
+};
+
+/**
  * Resolves a cover image URL from an infobox content map by filename field (e.g. `Image`,
  * `Image1`), falling back to `undefined` — letting the caller fall back to `page.thumbnail` —
  * when the field is absent or the file can't be resolved.
