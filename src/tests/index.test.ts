@@ -1726,6 +1726,12 @@ describe('getPage', () => {
         }),
       )
       .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': { pageid: 1, ns: 0, title: 'Batman', categories: [] },
+          '2': { pageid: 2, ns: 0, title: 'Joker', categories: [] },
+        }),
+      )
+      .mockResolvedValueOnce(
         jsonResponse({
           batchcomplete: '',
           query: { pages: { '3': { pageid: 3, ns: 0, title: 'Alfred', index: 2 } } },
@@ -1733,8 +1739,6 @@ describe('getPage', () => {
       )
       .mockResolvedValueOnce(
         categoriesResponse({
-          '1': { pageid: 1, ns: 0, title: 'Batman', categories: [] },
-          '2': { pageid: 2, ns: 0, title: 'Joker', categories: [] },
           '3': { pageid: 3, ns: 0, title: 'Alfred', categories: [] },
         }),
       );
@@ -1742,8 +1746,8 @@ describe('getPage', () => {
     const pages = await wiki('https://dc.fandom.com').getPage('dc', { limit: 3 });
 
     expect(pages).toHaveLength(3);
-    const secondUrl = new URL(fetchMock.mock.calls[1]![0] as string);
-    expect(secondUrl.searchParams.get('gsroffset')).toBe('2');
+    const continuationUrl = new URL(fetchMock.mock.calls[2]![0] as string);
+    expect(continuationUrl.searchParams.get('gsroffset')).toBe('2');
   });
 
   it('filters results by category when flags.category is provided', async () => {

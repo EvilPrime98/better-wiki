@@ -473,43 +473,10 @@ export function wiki(
 
   //PUBLIC INTERFACE
 
-  async function getPage(
-    query: string,
-    flags: Pick<WikiFlags, 'category' | 'categoriesOr' | 'thumbnailSize' | 'limit'> = {},
+  async function getWikiPagesFromPages(
+    pages: WikiGetPageResponse['query']['pages'][keyof WikiGetPageResponse['query']['pages']][],
+    flags: WikiFlags,
   ): Promise<WikiPage[]> {
-    const searchParams = {
-      action: 'query',
-      generator: 'search',
-      gsrsearch: query,
-      gsrnamespace: '0',
-      gsrlimit: flags.limit && flags.limit > 0 ? flags.limit.toString() : '20',
-      prop: 'info|pageimages|categories',
-      inprop: 'url',
-      piprop: 'thumbnail',
-      pithumbsize: '200',
-      cllimit: 'max', //categories get truncated after 500 (in total)
-    };
-
-    let data = await getCachedOrFetch<WikiGetPageResponse>(buildApiUrl(searchParams));
-    if (!data?.query) return [];
-    const pages = Object.values(data.query.pages);
-
-    while (flags.limit && pages.length < flags.limit && data.continue !== undefined) {
-      data = await getCachedOrFetch<WikiGetPageResponse>(
-        buildApiUrl({
-          ...searchParams,
-          gsroffset: String(data.continue.gsroffset),
-          continue: data.continue.continue,
-        }),
-      );
-
-      if (!data?.query) break;
-
-      pages.push(...Object.values(data.query.pages));
-    }
-
-    if (flags.limit && pages.length > flags.limit) pages.length = flags.limit;
-
     const idsMissingCategories = pages
       .filter((page) => !page.categories)
       .map((page) => page.pageid);
@@ -544,6 +511,50 @@ export function wiki(
         return targetCategories.some((cat) => categories.includes(cat));
       });
     }
+
+    return wikiPages;
+  }
+
+  async function getPage(
+    query: string,
+    flags: Pick<WikiFlags, 'category' | 'categoriesOr' | 'thumbnailSize' | 'limit'> = {},
+  ): Promise<WikiPage[]> {
+    const searchParams = {
+      action: 'query',
+      generator: 'search',
+      gsrsearch: query,
+      gsrnamespace: '0',
+      gsrlimit: flags.limit && flags.limit > 0 ? flags.limit.toString() : '20',
+      prop: 'info|pageimages',
+      inprop: 'url',
+      piprop: 'thumbnail',
+      pithumbsize: '200',
+    };
+
+    let data = await getCachedOrFetch<WikiGetPageResponse>(buildApiUrl(searchParams));
+    if (!data?.query) return [];
+
+    const pages = Object.values(data.query.pages);
+    const wikiPages = await getWikiPagesFromPages(pages, flags);
+
+    while (flags.limit && wikiPages.length < flags.limit && data.continue !== undefined) {
+      data = await getCachedOrFetch<WikiGetPageResponse>(
+        buildApiUrl({
+          ...searchParams,
+          gsroffset: String(data.continue.gsroffset),
+          continue: data.continue.continue,
+        }),
+      );
+
+      if (!data?.query) break;
+
+      const npages = Object.values(data.query.pages);
+      const nwikipages = await getWikiPagesFromPages(npages, flags);
+
+      wikiPages.push(...nwikipages);
+    }
+
+    if (flags.limit && wikiPages.length > flags.limit) wikiPages.length = flags.limit;
 
     return wikiPages;
   }
