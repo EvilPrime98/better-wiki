@@ -220,7 +220,7 @@ export interface WikiImageInfoResponse {
 /** @internal */
 export interface WikiGetPageResponse {
   batchcomplete: string;
-  continue?: { gsroffset: number; continue: string };
+  continue?: { gsroffset: number; clcontinue?: string; continue: string };
   warnings?: { query: { '*': string } };
   query: {
     pages: Record<

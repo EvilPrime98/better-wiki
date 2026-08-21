@@ -502,15 +502,34 @@ export function wiki(
   async function getWikiPagesFromPages(
     pages: WikiGetPageResponse['query']['pages'][keyof WikiGetPageResponse['query']['pages']][],
     flags: WikiFlags,
+    // MediaWiki caps categories at 500 total per request, shared across every page in
+    // the batch. When that cap is hit (`clcontinue` present on the response this batch
+    // came from), the inline `categories` on some pages here may be silently truncated
+    // — re-fetch every page in the batch through the clcontinue-paginated path below to
+    // guarantee complete category lists rather than risk a truncated one going undetected.
+    categoriesTruncated = false,
   ): Promise<WikiPage[]> {
-    const idsMissingCategories = pages
-      .filter((page) => !page.categories)
-      .map((page) => page.pageid);
+    const targetCategories = [...(flags.category ?? []), ...(flags.categoriesOr ?? [])];
 
-    const fetchedCategories = await getCategoriesForPages(...idsMissingCategories);
+    const idsMissingCategories =
+      targetCategories.length > 0
+        ? categoriesTruncated
+          ? // A truncated batch may have pages with a present-but-incomplete `categories`
+            // key (not just an absent one), so every page needs re-fetching, not just
+            // the ones that look "missing" at a glance.
+            pages.map((page) => page.pageid)
+          : []
+        : pages.filter((page) => !page.categories).map((page) => page.pageid);
+
+    const fetchedCategories = await getCategoriesForPages(
+      idsMissingCategories,
+      targetCategories.length > 0 ? targetCategories : undefined,
+    );
 
     let wikiPages = pages.map((page) => {
-      const categories = page.categories ?? fetchedCategories[page.pageid]?.categories ?? [];
+      // Prefer freshly re-fetched categories (guaranteed complete) over whatever came
+      // inline with the page — the latter is only used when it wasn't re-fetched at all.
+      const categories = fetchedCategories[page.pageid]?.categories ?? page.categories ?? [];
       return buildPage({
         thumbnail: scaleUrl(page.thumbnail?.source, flags.thumbnailSize),
         canonicalUrl: page.canonicalurl,
@@ -545,43 +564,92 @@ export function wiki(
     query: string,
     flags: Pick<WikiFlags, 'category' | 'categoriesOr' | 'thumbnailSize' | 'limit'> = {},
   ): Promise<WikiPage[]> {
-    const searchParams = {
+    const targetCategories = [...(flags.category ?? []), ...(flags.categoriesOr ?? [])];
+    const gsrlimit = flags.limit && flags.limit > 0 ? flags.limit : 20;
+
+    const searchParams: Record<string, string> = {
       action: 'query',
       generator: 'search',
       gsrsearch: query,
       gsrnamespace: '0',
-      gsrlimit: flags.limit && flags.limit > 0 ? flags.limit.toString() : '20',
-      prop: 'info|pageimages',
+      gsrlimit: gsrlimit.toString(),
+      prop: targetCategories.length > 0 ? 'info|pageimages|categories' : 'info|pageimages',
       inprop: 'url',
       piprop: 'thumbnail',
       pithumbsize: '200',
+      ...(targetCategories.length > 0
+        ? { cllimit: 'max', clcategories: targetCategories.join('|') }
+        : {}),
     };
 
     let data = await getCachedOrFetch<WikiGetPageResponse>(buildApiUrl(searchParams));
     if (!data?.query) return [];
 
     const pages = Object.values(data.query.pages);
-    const wikiPages = await getWikiPagesFromPages(pages, flags);
+    const wikiPages = await getWikiPagesFromPages(
+      pages,
+      flags,
+      data.continue?.clcontinue !== undefined,
+    );
 
-    while (flags.limit && wikiPages.length < flags.limit && data.continue !== undefined) {
-      data = await getCachedOrFetch<WikiGetPageResponse>(
-        buildApiUrl({
-          ...searchParams,
-          gsroffset: String(data.continue.gsroffset),
-          continue: data.continue.continue,
-        }),
-      );
+    if (targetCategories.length > 0) {
+      let nextOffset = data.continue?.gsroffset;
+      let waveSize = 4;
+      let waves = 0;
 
-      if (!data?.query) break;
+      while (
+        flags.limit &&
+        wikiPages.length < flags.limit &&
+        nextOffset !== undefined &&
+        waves < 10
+      ) {
+        const offsets = Array.from({ length: waveSize }, (_, i) => nextOffset! + i * gsrlimit);
 
-      const npages = Object.values(data.query.pages);
-      const nwikipages = await getWikiPagesFromPages(npages, flags);
+        const results = await Promise.all(
+          offsets.map((offset) =>
+            getCachedOrFetch<WikiGetPageResponse>(
+              buildApiUrl({ ...searchParams, gsroffset: String(offset) }),
+            ),
+          ),
+        );
 
-      wikiPages.push(...nwikipages);
+        nextOffset = undefined;
+        for (const res of results) {
+          if (!res?.query) break;
+          wikiPages.push(
+            ...(await getWikiPagesFromPages(
+              Object.values(res.query.pages),
+              flags,
+              res.continue?.clcontinue !== undefined,
+            )),
+          );
+          if (res.continue?.gsroffset === undefined) break;
+          nextOffset = res.continue.gsroffset;
+        }
+
+        waveSize = Math.min(waveSize * 2, 16);
+        waves++;
+      }
+    } else {
+      while (flags.limit && wikiPages.length < flags.limit && data.continue !== undefined) {
+        data = await getCachedOrFetch<WikiGetPageResponse>(
+          buildApiUrl({
+            ...searchParams,
+            gsroffset: String(data.continue.gsroffset),
+            continue: data.continue.continue,
+          }),
+        );
+
+        if (!data?.query) break;
+
+        const npages = Object.values(data.query.pages);
+        const nwikipages = await getWikiPagesFromPages(npages, flags);
+
+        wikiPages.push(...nwikipages);
+      }
     }
 
     if (flags.limit && wikiPages.length > flags.limit) wikiPages.length = flags.limit;
-
     return wikiPages;
   }
 
@@ -798,7 +866,8 @@ export function wiki(
     }
 
     const initialBatchCategories = await getCategoriesForPages(
-      ...initialBatch.map((m) => m.pageid),
+      initialBatch.map((m) => m.pageid),
+      titles.slice(1),
     );
 
     let initialBatchWithCategories = initialBatch.map((m) => ({
@@ -842,23 +911,27 @@ export function wiki(
   }
 
   async function getCategoriesFromPage(pageId: number): Promise<WikiPageCategory[]> {
-    const result = await getCategoriesForPages(pageId);
+    const result = await getCategoriesForPages([pageId]);
     return result[pageId]?.categories ?? [];
   }
 
   async function getCategoriesForPages(
-    ...pageIds: number[]
+    pageIds: number[],
+    categoryFilter?: string[],
   ): Promise<Record<string, { categories: WikiPageCategory[] }>> {
     const titleChunks = chunkArray(pageIds, 50);
     const totalPages: Record<string, { categories: WikiPageCategory[] }> = {};
 
     await Promise.all(
       titleChunks.map(async (chunk) => {
-        const baseParams = {
+        const baseParams: Record<string, string> = {
           action: 'query',
           pageids: chunk.join('|'),
           prop: 'categories',
           cllimit: 'max', // 500 max per request across all pages — paginate via clcontinue
+          ...(categoryFilter && categoryFilter.length > 0
+            ? { clcategories: categoryFilter.join('|') }
+            : {}),
         };
 
         let data = await getCachedOrFetch<CategoriesResponse>(buildApiUrl(baseParams));
