@@ -87,7 +87,7 @@ Factory function — returns a `Wiki` client for the given wiki URL.
 | `getPageContent(pageId)`                       | `string \| undefined` — raw wikitext                                                                                   |
 | `getPageContent(pageId, { structured: true })` | `Record<string, string>` — parsed infobox                                                                              |
 | `getCategoryMembers(categoryTitle)`            | `WikiCategoryMemberItem[]`                                                                                             |
-| `getCategoryMembers(titles[])`                 | `WikiCategoryMemberItem[]` — intersection across titles                                                                |
+| `getCategoryMembers(titles[])`                 | `WikiCategoryMemberItem[]` — intersection across titles, read left to right; put the most-narrowing category first     |
 | `searchCategories(query)`                      | `string[]`                                                                                                             |
 | `getCategoriesFromPage(pageId)`                | `Array<{ ns, title }>`                                                                                                 |
 | `getThumbnailById(pageId, width?)`             | `string` — thumbnail URL, optionally scaled to `width` px                                                              |

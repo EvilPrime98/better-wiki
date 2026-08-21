@@ -552,7 +552,10 @@ export interface Wiki {
     ): Promise<Record<string, string>>;
     (pageId: number, contentOptions?: WikiContentOptions): Promise<string | undefined>;
   };
-  /** Fetches the members of one or more categories, paginating through all results. */
+  /** Fetches the members of one or more categories, paginating through all results.
+   * The categories are read left to right, which means that the first category should always be
+   * the one who narrows the elements the most (for efficient queries that is.)
+   */
   getCategoryMembers: {
     (categoryTitle: string): Promise<WikiCategoryMemberItem[]>;
     (categoryTitle: string[]): Promise<WikiCategoryMemberItem[]>;
