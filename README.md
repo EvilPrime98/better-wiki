@@ -103,6 +103,11 @@ Pass `flags` to any page-fetching method to filter or augment results:
 | `thumbnailSize` | `number`   | Scale thumbnail URLs to this width (px) when building `WikiPage` results. |
 | `limit`         | `number`   | Cap the number of results returned (default: 20 for `getPage`).           |
 
+> When `category`/`categoriesOr` is passed to `getPage` (including indirectly, via plugin
+> methods like `getComic`), each result's `categories` field is restricted to just the
+> categories that matched the filter, not the page's full category list — this keeps
+> filtered searches fast. Call `getCategoriesFromPage` for a page's complete category list.
+
 ### `WikiPage` properties
 
 | Property       | Type       | Description                                            |
@@ -110,7 +115,7 @@ Pass `flags` to any page-fetching method to filter or augment results:
 | `id`           | `number`   | MediaWiki page ID.                                     |
 | `title`        | `string`   | Page title.                                            |
 | `thumbnail`    | `string`   | Thumbnail URL (empty string if the page has no image). |
-| `categories`   | `string[]` | Category titles the page belongs to.                   |
+| `categories`   | `string[]` | Category titles the page belongs to (see note above).  |
 | `canonicalUrl` | `string`   | Canonical URL of the page.                             |
 | `sourceWiki`   | `string`   | Base URL of the wiki this page was fetched from.       |
 

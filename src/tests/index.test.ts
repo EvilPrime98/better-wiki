@@ -133,7 +133,16 @@ const pageByTitleResponse = (
   });
 
 const searchPageResponse = (
-  pages: Record<string, { pageid: number; ns: number; title: string; index: number }>,
+  pages: Record<
+    string,
+    {
+      pageid: number;
+      ns: number;
+      title: string;
+      index: number;
+      categories?: { ns: number; title: string }[];
+    }
+  >,
 ) => jsonResponse({ batchcomplete: '', query: { pages } });
 
 const thumbnailApiResponse = (pageid: number, thumbnailSource?: string) =>
@@ -327,6 +336,42 @@ describe('getCategoryMembers', () => {
     );
     const result = await wiki('https://dc.fandom.com').getCategoryMembers('Category:Characters');
     expect(result).toEqual([{ pageid: 42, ns: 0, title: 'Batman' }]);
+  });
+
+  it('intersects members across multiple categories, restricted to the remaining titles', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        membersResponse([
+          { pageid: 1, ns: 0, title: 'Batman' },
+          { pageid: 2, ns: 0, title: 'Robin' },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': {
+            pageid: 1,
+            ns: 0,
+            title: 'Batman',
+            categories: [{ ns: 14, title: 'Category:Heroes' }],
+          },
+          // Robin has no `categories` key at all — it matched none of the categories
+          // requested via `clcategories`, so MediaWiki omits the key entirely.
+        }),
+      );
+
+    const result = await wiki('https://dc.fandom.com').getCategoryMembers([
+      'Category:Characters',
+      'Category:Heroes',
+    ]);
+
+    expect(result).toEqual([
+      { pageid: 1, ns: 0, title: 'Batman', categories: [{ ns: 14, title: 'Category:Heroes' }] },
+    ]);
+
+    // The second category (everything but the first, already-fetched one) is passed as
+    // `clcategories` so the intersection check only pulls the categories being tested for.
+    const categoriesUrl = new URL(fetchMock.mock.calls[1]![0] as string);
+    expect(categoriesUrl.searchParams.get('clcategories')).toBe('Category:Heroes');
   });
 });
 
@@ -1320,14 +1365,12 @@ describe('dc-fandom getComic flags', () => {
   it('includeCollections: true — accepts pages in Category:Collected Editions', async () => {
     fetchMock
       .mockResolvedValueOnce(
-        searchPageResponse({ '1': { pageid: 1, ns: 0, title: 'Batman Year One', index: 0 } }),
-      )
-      .mockResolvedValueOnce(
-        categoriesResponse({
+        searchPageResponse({
           '1': {
             pageid: 1,
             ns: 0,
             title: 'Batman Year One',
+            index: 0,
             categories: [{ ns: 14, title: 'Category:Collected Editions' }],
           },
         }),
@@ -1352,16 +1395,11 @@ describe('dc-fandom getComic flags', () => {
     fetchMock
       .mockResolvedValueOnce(
         searchPageResponse({
-          '1': { pageid: 1, ns: 0, title: 'Batman: Year One', index: 0 },
-          '2': { pageid: 2, ns: 0, title: 'Batman: Hush', index: 1 },
-        }),
-      )
-      .mockResolvedValueOnce(
-        categoriesResponse({
           '1': {
             pageid: 1,
             ns: 0,
             title: 'Batman: Year One',
+            index: 0,
             categories: [
               { ns: 14, title: 'Category:Comics' },
               { ns: 14, title: 'Category:Solo Stories' },
@@ -1371,6 +1409,7 @@ describe('dc-fandom getComic flags', () => {
             pageid: 2,
             ns: 0,
             title: 'Batman: Hush',
+            index: 1,
             categories: [{ ns: 14, title: 'Category:Comics' }],
           },
         }),
@@ -1939,29 +1978,20 @@ describe('getPage', () => {
   });
 
   it('filters results by category when flags.category is provided', async () => {
-    fetchMock
-      .mockResolvedValueOnce(
-        searchPageResponse({
-          '1': { pageid: 1, ns: 0, title: 'Batman', index: 0 },
-          '2': { pageid: 2, ns: 0, title: 'Joker', index: 1 },
-        }),
-      )
-      .mockResolvedValueOnce(
-        categoriesResponse({
-          '1': {
-            pageid: 1,
-            ns: 0,
-            title: 'Batman',
-            categories: [{ ns: 14, title: 'Category:Heroes' }],
-          },
-          '2': {
-            pageid: 2,
-            ns: 0,
-            title: 'Joker',
-            categories: [{ ns: 14, title: 'Category:Villains' }],
-          },
-        }),
-      );
+    fetchMock.mockResolvedValueOnce(
+      searchPageResponse({
+        '1': {
+          pageid: 1,
+          ns: 0,
+          title: 'Batman',
+          index: 0,
+          categories: [{ ns: 14, title: 'Category:Heroes' }],
+        },
+        // MediaWiki omits the `categories` key entirely for a page that matched none
+        // of the requested `clcategories` — simulated here by leaving it unset.
+        '2': { pageid: 2, ns: 0, title: 'Joker', index: 1 },
+      }),
+    );
     const pages = await wiki('https://dc.fandom.com').getPage('dc', {
       category: ['Category:Heroes'],
     });
@@ -1970,12 +2000,157 @@ describe('getPage', () => {
   });
 
   it('filters results by categoriesOr when flags.categoriesOr is provided', async () => {
+    fetchMock.mockResolvedValueOnce(
+      searchPageResponse({
+        '1': {
+          pageid: 1,
+          ns: 0,
+          title: 'Batman',
+          index: 0,
+          categories: [{ ns: 14, title: 'Category:Heroes' }],
+        },
+        '2': {
+          pageid: 2,
+          ns: 0,
+          title: 'Joker',
+          index: 1,
+          categories: [{ ns: 14, title: 'Category:Villains' }],
+        },
+        '3': { pageid: 3, ns: 0, title: 'Alfred', index: 2 },
+      }),
+    );
+    const pages = await wiki('https://dc.fandom.com').getPage('dc', {
+      categoriesOr: ['Category:Heroes', 'Category:Villains'],
+    });
+    expect(pages).toHaveLength(2);
+    expect(pages.map((p) => p.title)).toEqual(['Batman', 'Joker']);
+  });
+
+  it('fetches subsequent search offsets concurrently once category filtering is active', async () => {
     fetchMock
       .mockResolvedValueOnce(
-        searchPageResponse({
-          '1': { pageid: 1, ns: 0, title: 'Batman', index: 0 },
-          '2': { pageid: 2, ns: 0, title: 'Joker', index: 1 },
-          '3': { pageid: 3, ns: 0, title: 'Alfred', index: 2 },
+        jsonResponse({
+          batchcomplete: '',
+          continue: { gsroffset: 2, continue: 'gsroffset||' },
+          query: {
+            pages: {
+              '1': { pageid: 1, ns: 0, title: 'Batman', index: 0 },
+              '2': { pageid: 2, ns: 0, title: 'Joker', index: 1 },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          continue: { gsroffset: 4, continue: 'gsroffset||' },
+          query: {
+            pages: {
+              '3': {
+                pageid: 3,
+                ns: 0,
+                title: 'Robin',
+                index: 2,
+                categories: [{ ns: 14, title: 'Category:Heroes' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          continue: { gsroffset: 6, continue: 'gsroffset||' },
+          query: {
+            pages: {
+              '4': {
+                pageid: 4,
+                ns: 0,
+                title: 'Nightwing',
+                index: 3,
+                categories: [{ ns: 14, title: 'Category:Heroes' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ batchcomplete: '', query: { pages: {} } }))
+      .mockResolvedValueOnce(jsonResponse({ batchcomplete: '', query: { pages: {} } }));
+
+    const pages = await wiki('https://dc.fandom.com').getPage('dc', {
+      category: ['Category:Heroes'],
+      limit: 2,
+    });
+
+    expect(pages).toHaveLength(2);
+    expect(pages.map((p) => p.title)).toEqual(['Robin', 'Nightwing']);
+
+    // The initial page has no `category`-matching results, so all four offset
+    // requests in the wave (2, 4, 6, 8) are issued concurrently rather than one at
+    // a time — request order between them isn't guaranteed, so just check they all
+    // went out before any of them could have been sequentially awaited on the others.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    const offsets = fetchMock.mock.calls
+      .slice(1)
+      .map((call) => new URL(call[0] as string).searchParams.get('gsroffset'));
+    expect(offsets.sort()).toEqual(['2', '4', '6', '8']);
+  });
+
+  it('stops after 10 waves when a category filter never matches and the search never exhausts', async () => {
+    // Every offset the wave pagination tries comes back with a page that matched none
+    // of the requested categories (no `categories` key) plus a fresh `continue` token
+    // (offset advances by gsrlimit, same as real MediaWiki pagination), so nothing ever
+    // satisfies `flags.limit` and the search never signals exhaustion — the `waves < 10`
+    // cap is what stops this from looping forever.
+    fetchMock.mockImplementation(
+      dispatchNeverMatching as unknown as Parameters<typeof fetchMock.mockImplementation>[0],
+    );
+
+    function dispatchNeverMatching(input: RequestInfo | URL): Promise<Response> {
+      const gsroffset = Number(new URL(input as string).searchParams.get('gsroffset') ?? '0');
+      return Promise.resolve(
+        jsonResponse({
+          batchcomplete: '',
+          continue: { gsroffset: gsroffset + 100, continue: 'gsroffset||' },
+          query: {
+            pages: {
+              '1': { pageid: 1, ns: 0, title: 'Bystander', index: 0 },
+            },
+          },
+        }),
+      );
+    }
+
+    const pages = await wiki('https://dc.fandom.com').getPage('dc', {
+      category: ['Category:NeverMatches'],
+      limit: 100,
+    });
+
+    expect(pages).toEqual([]);
+    // 1 initial request + 10 waves of sizes 4, 8, 16, 16, 16, 16, 16, 16, 16, 16
+    // (wave size doubles up to a cap of 16) = 1 + 140 = 141 total requests.
+    expect(fetchMock).toHaveBeenCalledTimes(141);
+  });
+
+  it('re-fetches categories when clcontinue signals the inline categories were truncated', async () => {
+    // MediaWiki caps categories at 500 total per request, shared across every page in
+    // the batch. `clcontinue` on the response means that cap was hit — some page's
+    // `categories` here may look complete (or even empty) but actually isn't, so it
+    // must not be trusted at face value; a project incident (see fix/getpage-category-
+    // truncation) already happened from trusting an inline, potentially-truncated
+    // categories list without checking for this.
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          batchcomplete: '',
+          continue: { clcontinue: '1|Category:Heroes', continue: 'clcontinue||' },
+          query: {
+            pages: {
+              // Looks like it belongs to no categories — but that's only because the
+              // response was truncated before reaching `Category:Heroes` for this page.
+              '1': { pageid: 1, ns: 0, title: 'Batman', index: 0, categories: [] },
+            },
+          },
         }),
       )
       .mockResolvedValueOnce(
@@ -1986,25 +2161,20 @@ describe('getPage', () => {
             title: 'Batman',
             categories: [{ ns: 14, title: 'Category:Heroes' }],
           },
-          '2': {
-            pageid: 2,
-            ns: 0,
-            title: 'Joker',
-            categories: [{ ns: 14, title: 'Category:Villains' }],
-          },
-          '3': {
-            pageid: 3,
-            ns: 0,
-            title: 'Alfred',
-            categories: [{ ns: 14, title: 'Category:Supporting' }],
-          },
         }),
       );
+
     const pages = await wiki('https://dc.fandom.com').getPage('dc', {
-      categoriesOr: ['Category:Heroes', 'Category:Villains'],
+      categoriesOr: ['Category:Heroes'],
     });
-    expect(pages).toHaveLength(2);
-    expect(pages.map((p) => p.title)).toEqual(['Batman', 'Joker']);
+
+    expect(pages).toHaveLength(1);
+    expect(pages[0]!.title).toBe('Batman');
+    expect(pages[0]!.categories).toEqual(['Category:Heroes']);
+
+    const refetchUrl = new URL(fetchMock.mock.calls[1]![0] as string);
+    expect(refetchUrl.searchParams.get('pageids')).toBe('1');
+    expect(refetchUrl.searchParams.get('clcategories')).toBe('Category:Heroes');
   });
 
   it('accepts any plugin client under the exported WikiPlugin type', () => {
