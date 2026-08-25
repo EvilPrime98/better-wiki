@@ -872,7 +872,9 @@ export function wiki(
         ...m,
         categories: categoriesByPageId[m.pageid]?.categories ?? [],
       }))
-      .filter((m) => requiredCategories.every((target) => m.categories.some((c) => c.title === target)));
+      .filter((m) =>
+        requiredCategories.every((target) => m.categories.some((c) => c.title === target)),
+      );
   };
 
   async function getCategoryMembers(
