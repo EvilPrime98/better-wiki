@@ -1119,6 +1119,145 @@ describe('getCategoryMembers (pagination)', () => {
   });
 });
 
+describe('getCategoryMembers (limit flag)', () => {
+  it('returns immediately with no request when `limit` is 0', async () => {
+    const result = await wiki('https://dc.fandom.com').getCategoryMembers('Category:Heroes', {
+      limit: 0,
+    });
+
+    expect(result).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('caps a single-category fetch at `limit`, requesting only what is needed per page', async () => {
+    fetchMock.mockResolvedValueOnce(
+      membersResponse([
+        { pageid: 1, ns: 0, title: 'Batman' },
+        { pageid: 2, ns: 0, title: 'Superman' },
+      ]),
+    );
+
+    const result = await wiki('https://dc.fandom.com').getCategoryMembers('Category:Heroes', {
+      limit: 1,
+    });
+
+    expect(result).toEqual([{ pageid: 1, ns: 0, title: 'Batman' }]);
+    const url = new URL(fetchMock.mock.calls[0]![0] as string);
+    expect(url.searchParams.get('cmlimit')).toBe('1');
+  });
+
+  it('stops paginating a single category once `limit` members are collected', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          continue: { cmcontinue: 'page|2', continue: '-||' },
+          query: { categorymembers: [{ pageid: 1, ns: 0, title: 'Page One' }] },
+        }),
+      )
+      .mockResolvedValueOnce(
+        membersResponse([
+          { pageid: 2, ns: 0, title: 'Page Two' },
+          { pageid: 3, ns: 0, title: 'Page Three' },
+        ]),
+      );
+
+    const result = await wiki('https://dc.fandom.com').getCategoryMembers('Category:X', {
+      limit: 3,
+    });
+
+    expect(result.map((m) => m.pageid)).toEqual([1, 2, 3]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondUrl = new URL(fetchMock.mock.calls[1]![0] as string);
+    // Only 2 more members are needed after the first page's 1, not the full 500 cap.
+    expect(secondUrl.searchParams.get('cmlimit')).toBe('2');
+  });
+
+  it('caps a multi-category fetch at the filtered `limit` in growing batches, without scanning the full first category', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          continue: { cmcontinue: 'page|next', continue: '-||' },
+          query: {
+            categorymembers: [
+              { pageid: 1, ns: 0, title: 'Batman' },
+              { pageid: 2, ns: 0, title: 'Robin' },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': {
+            pageid: 1,
+            ns: 0,
+            title: 'Batman',
+            categories: [{ ns: 14, title: 'Category:Heroes' }],
+          },
+          // Robin omitted — didn't match `clcategories`.
+        }),
+      )
+      .mockResolvedValueOnce(membersResponse([{ pageid: 3, ns: 0, title: 'Superman' }]))
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '3': {
+            pageid: 3,
+            ns: 0,
+            title: 'Superman',
+            categories: [{ ns: 14, title: 'Category:Heroes' }],
+          },
+        }),
+      );
+
+    const result = await wiki('https://dc.fandom.com').getCategoryMembers(
+      ['Category:Characters', 'Category:Heroes'],
+      { limit: 2 },
+    );
+
+    expect(result.map((m) => m.pageid)).toEqual([1, 3]);
+    // 2 member-fetch requests + 2 category-check requests — the second, larger batch
+    // (cmlimit doubles from 25 to 50) is only reached because the first batch's single
+    // Heroes match didn't satisfy `limit` on its own.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const firstMembersUrl = new URL(fetchMock.mock.calls[0]![0] as string);
+    const secondMembersUrl = new URL(fetchMock.mock.calls[2]![0] as string);
+    expect(firstMembersUrl.searchParams.get('cmlimit')).toBe('25');
+    expect(secondMembersUrl.searchParams.get('cmlimit')).toBe('50');
+    expect(secondMembersUrl.searchParams.get('cmcontinue')).toBe('page|next');
+  });
+
+  it('returns fewer than `limit` matches, without looping further, once the first category is exhausted', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        membersResponse([
+          { pageid: 1, ns: 0, title: 'Batman' },
+          { pageid: 2, ns: 0, title: 'Robin' },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        categoriesResponse({
+          '1': {
+            pageid: 1,
+            ns: 0,
+            title: 'Batman',
+            categories: [{ ns: 14, title: 'Category:Heroes' }],
+          },
+          // Robin omitted — didn't match `clcategories`.
+        }),
+      );
+
+    const result = await wiki('https://dc.fandom.com').getCategoryMembers(
+      ['Category:Characters', 'Category:Heroes'],
+      { limit: 5 },
+    );
+
+    expect(result.map((m) => m.pageid)).toEqual([1]);
+    // No `continue` token on the batch above, so the first category is exhausted after
+    // one members-fetch + one category-check — the loop must not keep retrying for a
+    // `limit` (5) it can never reach.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('dc-fandom character.getAppearances', () => {
   it('returns comics from the character Appearances category', async () => {
     fetchMock

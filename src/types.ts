@@ -555,10 +555,15 @@ export interface Wiki {
   /** Fetches the members of one or more categories, paginating through all results.
    * The categories are read left to right, which means that the first category should always be
    * the one who narrows the elements the most (for efficient queries that is.)
+   *
+   * `flags.limit` caps the number of returned members. For a single category this stops
+   * pagination as soon as enough members are fetched. For multiple categories it caps the
+   * final, filtered result count — matching members are fetched and category-checked in
+   * growing batches until `limit` is reached, instead of scanning the entire first category.
    */
   getCategoryMembers: {
-    (categoryTitle: string): Promise<WikiCategoryMemberItem[]>;
-    (categoryTitle: string[]): Promise<WikiCategoryMemberItem[]>;
+    (categoryTitle: string, flags?: Pick<WikiFlags, 'limit'>): Promise<WikiCategoryMemberItem[]>;
+    (categoryTitle: string[], flags?: Pick<WikiFlags, 'limit'>): Promise<WikiCategoryMemberItem[]>;
   };
   /** Searches category titles (MediaWiki namespace 14) matching `query`. */
   searchCategories: (query: string) => Promise<string[]>;

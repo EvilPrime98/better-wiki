@@ -444,27 +444,37 @@ export function wiki(
     return result;
   };
 
-  async function membersForCategory(categoryTitle: string): Promise<WikiCategoryMemberItem[]> {
+  async function membersForCategory(
+    categoryTitle: string,
+    limit?: number,
+  ): Promise<WikiCategoryMemberItem[]> {
     const returnable: WikiCategoryMemberItem[] = [];
+
+    const nextCmlimit = () =>
+      limit !== undefined ? Math.min(500, Math.max(limit - returnable.length, 0)) : 500;
+
+    let cmlimit = nextCmlimit();
+    if (limit !== undefined && cmlimit === 0) return returnable;
 
     let data = await getCachedOrFetch<CategoryMembersResponse>(
       buildApiUrl({
         action: 'query',
         list: 'categorymembers',
         cmtitle: categoryTitle,
-        cmlimit: '500',
+        cmlimit: cmlimit.toString(),
       }),
     );
 
     returnable.push(...data.query.categorymembers);
 
-    while (data.continue !== undefined) {
+    while (data.continue !== undefined && (limit === undefined || returnable.length < limit)) {
+      cmlimit = nextCmlimit();
       data = await getCachedOrFetch<CategoryMembersResponse>(
         buildApiUrl({
           action: 'query',
           list: 'categorymembers',
           cmtitle: categoryTitle,
-          cmlimit: '500',
+          cmlimit: cmlimit.toString(),
           cmcontinue: data.continue.cmcontinue,
           continue: data.continue.continue,
         }),
@@ -473,7 +483,7 @@ export function wiki(
       returnable.push(...data.query.categorymembers);
     }
 
-    return returnable;
+    return limit !== undefined ? returnable.slice(0, limit) : returnable;
   }
 
   //BUILDERS
@@ -849,39 +859,88 @@ export function wiki(
     );
   }
 
-  async function getCategoryMembers(categoryTitle: string): Promise<WikiCategoryMemberItem[]>;
-  async function getCategoryMembers(categoryTitle: string[]): Promise<WikiCategoryMemberItem[]>;
+  const mergeCategoriesAndFilter = (
+    members: WikiCategoryMemberItem[],
+    categoriesByPageId: Record<string, { categories: WikiPageCategory[] }>,
+    requiredCategories: string[],
+  ) => {
+    return members
+      .map((m) => ({
+        ...m,
+        categories: categoriesByPageId[m.pageid]?.categories ?? [],
+      }))
+      .filter((m) =>
+        requiredCategories.every((target) => m.categories.some((c) => c.title === target)),
+      );
+  };
+
+  async function getCategoryMembers(
+    categoryTitle: string,
+    flags?: Pick<WikiFlags, 'limit'>,
+  ): Promise<WikiCategoryMemberItem[]>;
+  async function getCategoryMembers(
+    categoryTitle: string[],
+    flags?: Pick<WikiFlags, 'limit'>,
+  ): Promise<WikiCategoryMemberItem[]>;
   async function getCategoryMembers(
     categoryTitle: string | string[],
+    flags: Pick<WikiFlags, 'limit'> = {},
   ): Promise<WikiCategoryMemberItem[]> {
     const titles = Array.isArray(categoryTitle) ? categoryTitle : [categoryTitle];
 
     const firstCategory = titles[0];
     if (!firstCategory) return [];
 
-    const initialBatch = await membersForCategory(firstCategory);
-
     if (titles.length === 1) {
-      return initialBatch;
+      return membersForCategory(firstCategory, flags.limit);
     }
 
-    const initialBatchCategories = await getCategoriesForPages(
-      initialBatch.map((m) => m.pageid),
-      titles.slice(1),
-    );
+    const secondaryCategories = titles.slice(1);
 
-    let initialBatchWithCategories = initialBatch.map((m) => ({
-      ...m,
-      categories: initialBatchCategories[m.pageid]?.categories ?? [],
-    }));
+    if (flags.limit === undefined) {
+      const initialBatch = await membersForCategory(firstCategory);
+      const initialBatchCategories = await getCategoriesForPages(
+        initialBatch.map((m) => m.pageid),
+        secondaryCategories,
+      );
 
-    for (const targetCategory of titles.slice(1)) {
-      initialBatchWithCategories = initialBatchWithCategories.filter((m) => {
-        return m.categories.some((c) => c.title === targetCategory);
-      });
+      return mergeCategoriesAndFilter(initialBatch, initialBatchCategories, secondaryCategories);
     }
 
-    return initialBatchWithCategories;
+    // Filtering can shrink matches below `limit`, so fetch the first category in
+    // growing batches instead of capping the raw fetch, which could under-fill.
+    const limit = flags.limit;
+    const matches: WikiCategoryMemberItem[] = [];
+    let cmcontinueParams: { cmcontinue: string; continue: string } | undefined;
+    let batchSize = 25;
+
+    while (matches.length < limit) {
+      const data = await getCachedOrFetch<CategoryMembersResponse>(
+        buildApiUrl({
+          action: 'query',
+          list: 'categorymembers',
+          cmtitle: firstCategory,
+          cmlimit: batchSize.toString(),
+          ...(cmcontinueParams ?? {}),
+        }),
+      );
+
+      const batch = data.query.categorymembers;
+
+      if (batch.length > 0) {
+        const batchCategories = await getCategoriesForPages(
+          batch.map((m) => m.pageid),
+          secondaryCategories,
+        );
+        matches.push(...mergeCategoriesAndFilter(batch, batchCategories, secondaryCategories));
+      }
+
+      if (data.continue === undefined) break;
+      cmcontinueParams = { cmcontinue: data.continue.cmcontinue, continue: data.continue.continue };
+      batchSize = Math.min(batchSize * 2, 500);
+    }
+
+    return matches.slice(0, limit);
   }
 
   async function searchCategories(query: string): Promise<string[]> {
