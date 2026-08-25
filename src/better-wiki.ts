@@ -450,9 +450,6 @@ export function wiki(
   ): Promise<WikiCategoryMemberItem[]> {
     const returnable: WikiCategoryMemberItem[] = [];
 
-    // When a limit is given, request only as many members as still needed per page
-    // (capped at MediaWiki's 500 max) so pagination stops as soon as we have enough,
-    // instead of always walking the entire category via cmcontinue.
     const nextCmlimit = () =>
       limit !== undefined ? Math.min(500, Math.max(limit - returnable.length, 0)) : 500;
 
@@ -910,11 +907,8 @@ export function wiki(
       return mergeCategoriesAndFilter(initialBatch, initialBatchCategories, secondaryCategories);
     }
 
-    // With a limit and multiple categories, filtering can shrink the first category's
-    // matches below `limit`, so we can't just cap the raw fetch — fetch+filter the first
-    // category in growing batches (mirrors the search-offset wave pattern used for
-    // category-filtered getPage) until enough filtered matches are found or the first
-    // category runs out, instead of pre-fetching and category-checking it in full.
+    // Filtering can shrink matches below `limit`, so fetch the first category in
+    // growing batches instead of capping the raw fetch, which could under-fill.
     const limit = flags.limit;
     const matches: WikiCategoryMemberItem[] = [];
     let cmcontinueParams: { cmcontinue: string; continue: string } | undefined;
