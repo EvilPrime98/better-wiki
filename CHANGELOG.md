@@ -1,5 +1,15 @@
 # better-wiki
 
+## 0.21.4
+
+### Patch Changes
+
+- df94f22: Speed up `getCategoryMembers` for callers that only need the first N results (e.g. `.slice(0, limit)`). It now accepts a `limit` flag: for a single category, pagination stops as soon as enough members are collected instead of always walking the entire category via `cmcontinue`. For multiple categories, the first category is fetched and category-checked in growing batches (same wave pattern used to speed up category-filtered `getPage` in a prior release) until `limit` filtered matches are found, instead of pre-fetching and category-checking the entire first category up front.
+
+  Behavior note: when `limit` is supplied for a single category, `getCategoryMembers` may issue smaller `cmlimit` requests than the previous fixed `500` — this only affects how many members are requested per page, not which members are returned. Calls without `limit` are unaffected.
+
+- c707015: Fix a `TypeError` in the `dc-fandom` plugin when `sorted: true` was combined with a `fields` list that omitted `releaseDate`. `byReleaseDate` now tolerates a missing `releaseDate` (or missing/non-numeric parts), treating it as epoch `0` so undated comics sort first instead of throwing. Additionally, every `sorted: true` code path (`getComic({ multiple: true })`, `WikiVolume.getComics()`, `getCharacterAppearances`, and a character's `getAppearances()`) now selects `releaseDate` internally when sorting so the order stays meaningful, then strips it from the results if it wasn't in the caller's `fields` — the returned objects still contain only the requested keys.
+
 ## 0.21.3
 
 ### Patch Changes
