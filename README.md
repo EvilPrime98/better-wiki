@@ -229,6 +229,10 @@ than computed and discarded, so requesting a small field set also avoids the par
 everything else. Methods on the result (`getComics`, `getAppearances`) are always present
 regardless of `fields`, since they're accessors rather than data.
 
+`sorted: true` works regardless of whether `releaseDate` is in `fields` — it's selected
+internally for the sort and then removed from the results if you didn't request it, so the
+returned objects still contain only the keys you asked for.
+
 ```ts
 const comic = await dc.getComic('Batman #700 (2010)', { fields: ['cover', 'credits'] });
 comic!.cover; // present

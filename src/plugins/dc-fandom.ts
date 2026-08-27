@@ -164,13 +164,46 @@ export interface WikiCharacter {
   sourceWiki: string;
 }
 
-const byReleaseDate = (a: WikiComic, b: WikiComic): number => {
-  const r1 = Number(a.releaseDate.releaseYear) - Number(b.releaseDate.releaseYear);
-  if (r1 !== 0) return r1;
-  const r2 = Number(a.releaseDate.releaseMonth) - Number(b.releaseDate.releaseMonth);
-  if (r2 !== 0) return r2;
-  return Number(a.releaseDate.releaseDay) - Number(b.releaseDate.releaseDay);
-};
+// `fields` and `sorted` are independent flags: a comic built with a `fields` list that
+// omits `releaseDate` has no `releaseDate` key at all. Coerce a missing date (or a
+// missing/non-numeric part) to `0` so undated comics sort first and the comparator can
+// never throw, matching the existing `Number('') === 0` behavior for empty sub-fields.
+const releaseDatePart = (comic: WikiComic, part: keyof WikiComic['releaseDate']): number =>
+  Number(comic.releaseDate?.[part] ?? 0) || 0;
+
+const byReleaseDate = (a: WikiComic, b: WikiComic): number =>
+  releaseDatePart(a, 'releaseYear') - releaseDatePart(b, 'releaseYear') ||
+  releaseDatePart(a, 'releaseMonth') - releaseDatePart(b, 'releaseMonth') ||
+  releaseDatePart(a, 'releaseDay') - releaseDatePart(b, 'releaseDay');
+
+// When `sorted: true` is combined with a `fields` list that omits `releaseDate`, force
+// `releaseDate` into the built objects so the sort stays meaningful, then drop it again
+// afterward so the result still respects `fields`. No-op when `fields` is undefined (every
+// builder already runs) or already includes `releaseDate`.
+const needsReleaseDateForSort = (fields: (keyof WikiComic)[] | undefined): boolean =>
+  fields !== undefined && !fields.includes('releaseDate');
+
+const fieldsWithReleaseDate = (
+  fields: (keyof WikiComic)[] | undefined,
+): (keyof WikiComic)[] | undefined =>
+  needsReleaseDateForSort(fields) ? [...fields!, 'releaseDate'] : fields;
+
+const stripUnrequestedReleaseDate = (
+  comics: WikiComic[],
+  fields: (keyof WikiComic)[] | undefined,
+): WikiComic[] =>
+  needsReleaseDateForSort(fields)
+    ? comics.map(({ releaseDate: _releaseDate, ...rest }) => rest as WikiComic)
+    : comics;
+
+// Sort by release date when requested, transparently selecting `releaseDate` for the sort
+// and stripping it back out if the caller didn't ask for it.
+const sortComics = (
+  comics: WikiComic[],
+  sorted: boolean | undefined,
+  fields: (keyof WikiComic)[] | undefined,
+): WikiComic[] =>
+  sorted === true ? stripUnrequestedReleaseDate(comics.toSorted(byReleaseDate), fields) : comics;
 
 /**
  * Extends a base {@link Wiki} client with DC Fandom-specific lookups for comics,
@@ -692,6 +725,8 @@ export function dcFandomPlugin(wikiClient: Wiki) {
 
     if (flags.multiple === true) {
       if (pages.length === 0) return [];
+      const buildFields =
+        flags.sorted === true ? fieldsWithReleaseDate(flags.fields) : flags.fields;
       const comics = await Promise.all(
         candidates.map(async (c) => {
           const cover = await resolveCoverFromContent(
@@ -700,10 +735,10 @@ export function dcFandomPlugin(wikiClient: Wiki) {
             'Image',
             flags.thumbnailSize,
           );
-          return wikiComicBuilder(c.page, c.content, flags.fields, cover);
+          return wikiComicBuilder(c.page, c.content, buildFields, cover);
         }),
       );
-      return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
+      return sortComics(comics, flags.sorted, flags.fields);
     }
 
     if (pages.length === 0) return null;
@@ -874,12 +909,17 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       fields?: (keyof WikiComic)[];
     } = {},
   ): Promise<WikiComic[]> => {
-    const { sorted, ...getComicFlags } = flags;
+    const { sorted, fields, ...rest } = flags;
+    const buildFields = sorted === true ? fieldsWithReleaseDate(fields) : fields;
+    const getComicFlags = {
+      ...rest,
+      ...(buildFields !== undefined ? { fields: buildFields } : {}),
+    };
     const comics = (
       await Promise.all(issueList.map((title) => getComic(title, getComicFlags)))
     ).filter((c): c is WikiComic => c !== null);
 
-    return sorted === true ? comics.toSorted(byReleaseDate) : comics;
+    return sortComics(comics, sorted, fields);
   };
 
   /**
@@ -1002,13 +1042,14 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       await wikiClient.getCategoryMembers(`Category:${characterTitle}/Appearances`)
     ).map((t) => t.pageid);
 
+    const buildFields = flags.sorted === true ? fieldsWithReleaseDate(flags.fields) : flags.fields;
     const comics = (
       await Promise.all(
-        pageIds.map((id) => getComicById(id, flags.fields ? { fields: flags.fields } : undefined)),
+        pageIds.map((id) => getComicById(id, buildFields ? { fields: buildFields } : undefined)),
       )
     ).filter((c): c is WikiComic => c !== null);
 
-    return flags.sorted === true ? comics.toSorted(byReleaseDate) : comics;
+    return sortComics(comics, flags.sorted, flags.fields);
   }
 
   return {

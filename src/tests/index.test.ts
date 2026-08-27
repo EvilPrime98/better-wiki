@@ -1570,6 +1570,174 @@ describe('dc-fandom getComic flags', () => {
   });
 });
 
+describe('dc-fandom sorted + fields interaction (issue #58)', () => {
+  // Issue 2 predates issue 1, so a correct release-date sort reverses insertion order.
+  const COMICS: Record<number, { title: string; year: string; month: string; day: string }> = {
+    1: { title: 'Batman Vol 1 1', year: '2020', month: 'June', day: '1' },
+    2: { title: 'Batman Vol 1 2', year: '2019', month: 'January', day: '1' },
+  };
+
+  const comicInfobox = (pageid: number) => {
+    const c = COMICS[pageid]!;
+    return `{{ComicInfobox\n| Volume = 1\n| Issue = ${pageid}\n| Year = ${c.year}\n| Month = ${c.month}\n| Day = ${c.day}\n}}`;
+  };
+
+  const bothComicSearchPages = () =>
+    searchPageResponse({
+      '1': {
+        pageid: 1,
+        ns: 0,
+        title: COMICS[1]!.title,
+        index: 0,
+        categories: [{ ns: 14, title: 'Category:Comics' }],
+      },
+      '2': {
+        pageid: 2,
+        ns: 0,
+        title: COMICS[2]!.title,
+        index: 1,
+        categories: [{ ns: 14, title: 'Category:Comics' }],
+      },
+    });
+
+  const install = (dispatch: (input: RequestInfo | URL) => Promise<Response>) =>
+    fetchMock.mockImplementation(
+      dispatch as unknown as Parameters<typeof fetchMock.mockImplementation>[0],
+    );
+
+  // getComic('Batman', { multiple: true }): one search, then one content fetch per candidate.
+  const dispatchGetComicMultiple = (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(input as string);
+    if (url.searchParams.get('gsrsearch') !== null) return Promise.resolve(bothComicSearchPages());
+    const pageid = Number(url.searchParams.get('pageids'));
+    return Promise.resolve(
+      comicWikitextResponse(pageid, COMICS[pageid]!.title, comicInfobox(pageid)),
+    );
+  };
+
+  it('getComic multiple:true + sorted:true does not throw and still sorts when fields omits releaseDate', async () => {
+    install(dispatchGetComicMultiple);
+    const result = await wiki({ plugin: 'dc-fandom' }).getComic('Batman', {
+      multiple: true,
+      sorted: true,
+      fields: ['title', 'pageId'],
+    });
+    expect(result.map((c) => c.title)).toEqual(['Batman Vol 1 2', 'Batman Vol 1 1']);
+    // releaseDate is pulled in for the sort, then stripped because the caller didn't request it.
+    expect(result.some((c) => 'releaseDate' in c)).toBe(false);
+    expect(Object.keys(result[0]!).sort()).toEqual(['pageId', 'title']);
+  });
+
+  it('getComic multiple:true + sorted:true keeps releaseDate when fields explicitly includes it', async () => {
+    install(dispatchGetComicMultiple);
+    const result = await wiki({ plugin: 'dc-fandom' }).getComic('Batman', {
+      multiple: true,
+      sorted: true,
+      fields: ['title', 'releaseDate'],
+    });
+    expect(result.map((c) => c.releaseDate.releaseYear)).toEqual(['2019', '2020']);
+  });
+
+  it('getComic multiple:true + sorted:true is unchanged when no fields list is passed', async () => {
+    install(dispatchGetComicMultiple);
+    const result = await wiki({ plugin: 'dc-fandom' }).getComic('Batman', {
+      multiple: true,
+      sorted: true,
+    });
+    expect(result.map((c) => c.releaseDate.releaseYear)).toEqual(['2019', '2020']);
+  });
+
+  // getCharacterAppearances(title): category members, then getComicById (page info + content) per member.
+  const dispatchAppearances = (input: RequestInfo | URL): Promise<Response> => {
+    const url = new URL(input as string);
+    if (url.searchParams.get('cmtitle') !== null) {
+      return Promise.resolve(
+        comicMembersResponse([
+          { pageid: 1, ns: 0, title: COMICS[1]!.title },
+          { pageid: 2, ns: 0, title: COMICS[2]!.title },
+        ]),
+      );
+    }
+    const pageid = Number(url.searchParams.get('pageids'));
+    if (url.searchParams.get('rvprop') === 'content') {
+      return Promise.resolve(
+        comicWikitextResponse(pageid, COMICS[pageid]!.title, comicInfobox(pageid)),
+      );
+    }
+    return Promise.resolve(pageByIdResponse(pageid, COMICS[pageid]!.title));
+  };
+
+  it('getCharacterAppearances sorted:true does not throw and still sorts when fields omits releaseDate', async () => {
+    install(dispatchAppearances);
+    const result = await wiki({ plugin: 'dc-fandom' }).getCharacterAppearances('Batman', {
+      sorted: true,
+      fields: ['title', 'pageId'],
+    });
+    expect(result.map((c) => c.title)).toEqual(['Batman Vol 1 2', 'Batman Vol 1 1']);
+    expect(result.some((c) => 'releaseDate' in c)).toBe(false);
+  });
+
+  it('character.getAppearances sorted:true does not throw when fields omits releaseDate', async () => {
+    install((input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(input as string);
+      if (url.searchParams.get('cmtitle') !== null) {
+        return Promise.resolve(
+          comicMembersResponse([
+            { pageid: 1, ns: 0, title: COMICS[1]!.title },
+            { pageid: 2, ns: 0, title: COMICS[2]!.title },
+          ]),
+        );
+      }
+      const pageid = Number(url.searchParams.get('pageids'));
+      if (url.searchParams.get('rvprop') === 'content') {
+        return pageid === 7
+          ? Promise.resolve(
+              comicWikitextResponse(7, 'Batman', '{{Character\n| RealName = Bruce Wayne\n}}'),
+            )
+          : Promise.resolve(
+              comicWikitextResponse(pageid, COMICS[pageid]!.title, comicInfobox(pageid)),
+            );
+      }
+      return Promise.resolve(
+        pageByIdResponse(pageid, pageid === 7 ? 'Batman' : COMICS[pageid]!.title),
+      );
+    });
+
+    const character = await wiki({ plugin: 'dc-fandom' }).getCharacterById(7);
+    const result = await character!.getAppearances({ sorted: true, fields: ['title'] });
+    expect(result.map((c) => c.title)).toEqual(['Batman Vol 1 2', 'Batman Vol 1 1']);
+    expect(result.some((c) => 'releaseDate' in c)).toBe(false);
+  });
+
+  it('volume.getComics sorted:true does not throw and still sorts when fields omits releaseDate', async () => {
+    install((input: RequestInfo | URL): Promise<Response> => {
+      const url = new URL(input as string);
+      if (url.searchParams.get('gsrsearch') !== null)
+        return Promise.resolve(bothComicSearchPages());
+      const pageid = Number(url.searchParams.get('pageids'));
+      if (url.searchParams.get('rvprop') === 'content') {
+        return pageid === 42
+          ? Promise.resolve(
+              comicWikitextResponse(
+                42,
+                'Batman Vol 1',
+                '{{VolumeInfobox\n| Type = Ongoing\n| IssueList = {{a|Batman Vol 1 1}}\n{{a|Batman Vol 1 2}}\n}}',
+              ),
+            )
+          : Promise.resolve(
+              comicWikitextResponse(pageid, COMICS[pageid]!.title, comicInfobox(pageid)),
+            );
+      }
+      return Promise.resolve(pageByIdResponse(42, 'Batman Vol 1'));
+    });
+
+    const volume = await wiki({ plugin: 'dc-fandom' }).getVolumeById(42);
+    const result = await volume!.getComics({ sorted: true, fields: ['title', 'pageId'] });
+    expect(result.map((c) => c.title)).toEqual(['Batman Vol 1 2', 'Batman Vol 1 1']);
+    expect(result.some((c) => 'releaseDate' in c)).toBe(false);
+  });
+});
+
 describe('getComic/getVolume/getCharacter — multiple:true raised limit (issue #41)', () => {
   it('getComic: multiple:true without an explicit limit requests gsrlimit=50', async () => {
     fetchMock.mockResolvedValueOnce(searchPageResponse({}));
