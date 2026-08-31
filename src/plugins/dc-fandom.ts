@@ -475,6 +475,40 @@ export function dcFandomPlugin(wikiClient: Wiki) {
     return result;
   };
 
+  const monthMap: Record<string, string> = {
+    default: '00',
+    January: '01',
+    February: '02',
+    March: '03',
+    April: '04',
+    May: '05',
+    June: '06',
+    July: '07',
+    August: '08',
+    September: '09',
+    October: '10',
+    November: '11',
+    December: '12',
+  };
+
+  // The DC ComicInfobox stores the release date as separate Day, Month and Year fields.
+  // The Month field holds an English month name. Return zero-padded numeric parts,
+  // because callers and `byReleaseDate` expect numbers. An unrecognized month
+  // (for example a season such as "Spring") gives ''.
+  const parseReleaseDateParts = (
+    day?: string,
+    month?: string,
+    year?: string,
+  ): WikiReleaseDate => {
+    const trimmedDay = day?.trim();
+    const trimmedMonth = month?.trim();
+    return {
+      releaseDay: trimmedDay ? trimmedDay.padStart(2, '0') : '',
+      releaseMonth: trimmedMonth ? monthMap[trimmedMonth] ?? '' : '',
+      releaseYear: year?.trim() || '',
+    };
+  };
+
   const wikiComicBuilder = (
     page: WikiPage | undefined,
     content: WikiStrContent,
@@ -487,11 +521,8 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       issue: () => content['Issue'] || '',
       cover: () => resolvedCover || page?.thumbnail || '',
       pageId: () => page?.id || -1,
-      releaseDate: () => ({
-        releaseDay: content['Day'] || '',
-        releaseMonth: content['Month'] || '',
-        releaseYear: content['Year'] || '',
-      }),
+      releaseDate: () =>
+        parseReleaseDateParts(content['Day'], content['Month'], content['Year']),
       credits: () => buildCredits(content),
       synopsis: () => collectSequential(content, (i) => `Synopsis${i}`).join('\n\n') || '',
       rating: () => content['Rating'] || '',
