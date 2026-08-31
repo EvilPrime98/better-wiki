@@ -1570,6 +1570,62 @@ describe('dc-fandom getComic flags', () => {
   });
 });
 
+describe('dc-fandom releaseDate normalization (issue #60)', () => {
+  const comicById = async (id: number, wikitext: string) => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          query: {
+            pages: {
+              [String(id)]: {
+                pageid: id,
+                ns: 0,
+                title: 'Batman Vol 1 1',
+                index: 0,
+                categories: [{ ns: 14, title: 'Category:Comics' }],
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(comicWikitextResponse(id, 'Batman Vol 1 1', wikitext));
+    return wiki({ plugin: 'dc-fandom' }).getComicById(id);
+  };
+
+  it('converts a month name to a zero-padded number and zero-pads a single-digit day', async () => {
+    const comic = await comicById(
+      42,
+      '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n| Year = 2025\n| Month = March\n| Day = 5\n}}',
+    );
+    expect(comic!.releaseDate).toEqual({
+      releaseDay: '05',
+      releaseMonth: '03',
+      releaseYear: '2025',
+    });
+  });
+
+  it('returns an empty releaseMonth for an unrecognized month value (e.g. a season)', async () => {
+    const comic = await comicById(
+      42,
+      '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n| Year = 2025\n| Month = Spring\n| Day = 15\n}}',
+    );
+    expect(comic!.releaseDate).toEqual({
+      releaseDay: '15',
+      releaseMonth: '',
+      releaseYear: '2025',
+    });
+  });
+
+  it('leaves every part empty when the infobox omits Day/Month/Year', async () => {
+    const comic = await comicById(42, '{{ComicInfobox\n| Volume = 1\n| Issue = 1\n}}');
+    expect(comic!.releaseDate).toEqual({
+      releaseDay: '',
+      releaseMonth: '',
+      releaseYear: '',
+    });
+  });
+});
+
 describe('dc-fandom sorted + fields interaction (issue #58)', () => {
   // Issue 2 predates issue 1, so a correct release-date sort reverses insertion order.
   const COMICS: Record<number, { title: string; year: string; month: string; day: string }> = {
