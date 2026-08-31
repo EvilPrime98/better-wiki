@@ -495,16 +495,12 @@ export function dcFandomPlugin(wikiClient: Wiki) {
   // The Month field holds an English month name. Return zero-padded numeric parts,
   // because callers and `byReleaseDate` expect numbers. An unrecognized month
   // (for example a season such as "Spring") gives ''.
-  const parseReleaseDateParts = (
-    day?: string,
-    month?: string,
-    year?: string,
-  ): WikiReleaseDate => {
+  const parseReleaseDateParts = (day?: string, month?: string, year?: string): WikiReleaseDate => {
     const trimmedDay = day?.trim();
     const trimmedMonth = month?.trim();
     return {
       releaseDay: trimmedDay ? trimmedDay.padStart(2, '0') : '',
-      releaseMonth: trimmedMonth ? monthMap[trimmedMonth] ?? '' : '',
+      releaseMonth: trimmedMonth ? (monthMap[trimmedMonth] ?? '') : '',
       releaseYear: year?.trim() || '',
     };
   };
@@ -521,8 +517,7 @@ export function dcFandomPlugin(wikiClient: Wiki) {
       issue: () => content['Issue'] || '',
       cover: () => resolvedCover || page?.thumbnail || '',
       pageId: () => page?.id || -1,
-      releaseDate: () =>
-        parseReleaseDateParts(content['Day'], content['Month'], content['Year']),
+      releaseDate: () => parseReleaseDateParts(content['Day'], content['Month'], content['Year']),
       credits: () => buildCredits(content),
       synopsis: () => collectSequential(content, (i) => `Synopsis${i}`).join('\n\n') || '',
       rating: () => content['Rating'] || '',
