@@ -1,5 +1,11 @@
 # better-wiki
 
+## 0.22.0
+
+### Minor Changes
+
+- 093fa9e: Add a `better-wiki` CLI (`bin/cli.ts`) exposing every base and plugin client method as a command that prints JSON.
+
 ## 0.21.5
 
 ### Patch Changes
