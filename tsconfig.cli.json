@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "dist-cli" },
+  "include": ["bin", "src"],
+  "exclude": ["node_modules", "dist", "dist-cli", "**/*.test.ts", "**/*.spec.ts"]
+}

@@ -255,6 +255,19 @@ const marvel = wiki({ plugin: 'marvel-fandom' });
 const comic = await marvel.getComic('Immortal Hulk #1 (2018)');
 ```
 
+## CLI
+
+Every client method is available from the command line and prints JSON:
+
+```bash
+npx better-wiki -p dc-fandom comic "Action Comics #1000 (2018)"
+npx better-wiki -p marvel-fandom character "Peter Parker" --multiple --limit 5
+npx better-wiki -u https://starwars.fandom.com page "Luke Skywalker"
+npx better-wiki --help   # all commands, connection options and flags
+```
+
+Base commands: `page`, `page-by-id`, `page-by-title`, `category-pages`, `thumbnail`, `file-url`, `content`, `category-members`, `search-categories`, `page-categories`, `infobox`, `structured-content`, `images`, `gallery`. Plugin commands (need `--plugin`): `comic`, `comic-by-id`, `volume`, `volume-by-id`, `character`, `character-by-id`, `character-appearances`.
+
 ## Development
 
 ```bash

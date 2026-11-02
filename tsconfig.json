@@ -5,7 +5,7 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2024", "DOM"],
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -14,8 +14,9 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "skipLibCheck": true,
-    "stripInternal": true
+    "stripInternal": true,
+    "types": ["node"]
   },
-  "include": ["src"],
+  "include": ["src", "bin"],
   "exclude": ["node_modules", "dist"]
 }

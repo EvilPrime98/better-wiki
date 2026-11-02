@@ -5,7 +5,7 @@ import prettier from 'eslint-config-prettier';
 export default tseslint.config(
   js.configs.recommended,
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'bin/**/*.ts'],
     extends: tseslint.configs.recommendedTypeChecked,
     languageOptions: {
       parserOptions: {
@@ -24,6 +24,6 @@ export default tseslint.config(
   },
   prettier,
   {
-    ignores: ['dist/', 'node_modules/', 'coverage/'],
+    ignores: ['dist/', 'dist-cli/', 'node_modules/', 'coverage/'],
   },
 );
